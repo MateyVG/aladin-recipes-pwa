@@ -4,15 +4,14 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = 'https://mkdsiwuyepryxjiqrdrc.supabase.co'
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rZHNpd3V5ZXByeXhqaXFyZHJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg4NzM4NTgsImV4cCI6MjA3NDQ0OTg1OH0.1lQvcs9m29ONvh9jF-4DaE7uzVuE1lx5kmjrXcZP_q0'
 
-// ВАЖНО: Попълни с истинския service role key от Supabase Dashboard
-// Settings → API → service_role key (пази го в .env файл!)
-const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_KEY || 'PASTE_YOUR_SERVICE_KEY_HERE'
+// !!! ВАЖНО: Вземи service_role key от Supabase Dashboard -> Settings -> API
+// И го сложи в .env файл като VITE_SUPABASE_SERVICE_KEY
+const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_KEY || 'твоят-service-role-key'
 
-// Обикновен клиент за нормални операции
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// Admin клиент за създаване на потребители
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+// Admin клиент - ИЗПОЛЗВАЙ САМО НА BACKEND или за admin операции
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false
@@ -57,7 +56,8 @@ async function createDepartmentsForRestaurant(restaurantId) {
 export const createNewManager = async (email, password, fullName = '') => {
   try {
     console.log('Creating manager:', email)
-
+    
+    // Създай потребителя с admin клиент
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email,
       password: password,
@@ -66,14 +66,30 @@ export const createNewManager = async (email, password, fullName = '') => {
         full_name: fullName || email.split('@')[0]
       }
     })
-
+    
     if (authError) {
       console.error('Auth error:', authError)
       return { success: false, error: authError.message }
     }
-
+    
     const userId = authData.user.id
-
+    
+    // Използвай SQL функцията да създаде profile
+    const { data: profileResult, error: profileError } = await supabase.rpc('create_user_profile', {
+      p_user_id: userId,
+      p_email: email,
+      p_role: 'manager',
+      p_full_name: fullName || email.split('@')[0]
+    })
+    
+    if (profileError || !profileResult.success) {
+      console.error('Profile error:', profileError || profileResult.error)
+      // Изтрий потребителя ако profile не е създаден
+      await supabaseAdmin.auth.admin.deleteUser(userId)
+      return { success: false, error: profileResult?.error || 'Грешка при създаване на профил' }
+    }
+    
+    // Създай ресторант
     const { data: restaurant, error: restaurantError } = await supabase
       .from('restaurants')
       .insert({
@@ -83,37 +99,32 @@ export const createNewManager = async (email, password, fullName = '') => {
       })
       .select()
       .single()
-
+    
     if (restaurantError) {
       console.error('Restaurant error:', restaurantError)
-      await supabaseAdmin.auth.admin.deleteUser(userId)
       return { success: false, error: 'Грешка при създаване на ресторант' }
     }
-
+    
+    // Създай отдели
     const { data: departments, error: deptError } = await createDepartmentsForRestaurant(restaurant.id)
     
     if (deptError) {
       console.error('Departments error:', deptError)
     }
-
-    const { data: profile, error: profileError } = await supabase
+    
+    // Актуализирай профила с restaurant_id
+    const { data: profile, error: updateError } = await supabase
       .from('profiles')
-      .upsert({
-        id: userId,
-        email: email,
-        full_name: fullName || email.split('@')[0],
-        role: 'manager',
-        restaurant_id: restaurant.id,
-        active: true
-      })
+      .update({ restaurant_id: restaurant.id })
+      .eq('id', userId)
       .select()
       .single()
-
-    if (profileError) {
-      console.error('Profile error:', profileError)
-      return { success: false, error: 'Грешка при създаване на профил' }
+    
+    if (updateError) {
+      console.error('Profile update error:', updateError)
+      return { success: false, error: 'Грешка при актуализиране на профил' }
     }
-
+    
     return {
       success: true,
       data: {
@@ -124,7 +135,7 @@ export const createNewManager = async (email, password, fullName = '') => {
       },
       message: 'Успешно създаден мениджър'
     }
-
+    
   } catch (error) {
     console.error('Unexpected error:', error)
     return {
@@ -178,17 +189,14 @@ export const createSuperAdmin = async (email, password, fullName) => {
 
     if (authError) throw authError
 
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .upsert({
-        id: authData.user.id,
-        email: email,
-        full_name: fullName,
-        role: 'super_admin',
-        active: true
-      })
+    const { data: profileResult } = await supabase.rpc('create_user_profile', {
+      p_user_id: authData.user.id,
+      p_email: email,
+      p_role: 'super_admin',
+      p_full_name: fullName
+    })
 
-    if (profileError) throw profileError
+    if (!profileResult.success) throw new Error(profileResult.error)
 
     return { success: true, data: authData.user }
   } catch (error) {
@@ -207,17 +215,14 @@ export const createReportsAdmin = async (email, password, fullName) => {
 
     if (authError) throw authError
 
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .upsert({
-        id: authData.user.id,
-        email: email,
-        full_name: fullName,
-        role: 'reports_admin',
-        active: true
-      })
+    const { data: profileResult } = await supabase.rpc('create_user_profile', {
+      p_user_id: authData.user.id,
+      p_email: email,
+      p_role: 'reports_admin',
+      p_full_name: fullName
+    })
 
-    if (profileError) throw profileError
+    if (!profileResult.success) throw new Error(profileResult.error)
 
     return { success: true, data: authData.user }
   } catch (error) {
