@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Plus, Trash2, Calendar, Users, Droplet, AlertCircle, FileText } from 'lucide-react';
-
+import { supabase } from '../../lib/supabase';
 const OilChangeChecklist = ({ template = {}, config = {}, department = {}, restaurantId, onBack }) => {
   const [loading, setLoading] = useState(false);
   
