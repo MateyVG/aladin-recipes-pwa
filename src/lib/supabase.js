@@ -57,14 +57,14 @@ export const createNewManager = async (email, password, fullName = '') => {
   try {
     console.log('Creating manager:', email)
     
-    // Създай потребителя с admin клиент
+    // IMPORTANT: Don't put cyrillic/unicode characters in user_metadata
+    // It causes "String contains non ISO-8859-1 code point" error
+    // The full_name will be stored in the profiles table instead
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: email,
+      email: email.trim().toLowerCase(),
       password: password,
-      email_confirm: true,
-      user_metadata: {
-        full_name: fullName || email.split('@')[0]
-      }
+      email_confirm: true
+      // NO user_metadata with cyrillic!
     })
     
     if (authError) {
@@ -73,13 +73,14 @@ export const createNewManager = async (email, password, fullName = '') => {
     }
     
     const userId = authData.user.id
+    const displayName = fullName || email.split('@')[0]
     
-    // Използвай SQL функцията да създаде profile
+    // Използвай SQL функцията да създаде profile (името се запазва тук)
     const { data: profileResult, error: profileError } = await supabase.rpc('create_user_profile', {
       p_user_id: userId,
-      p_email: email,
+      p_email: email.trim().toLowerCase(),
       p_role: 'manager',
-      p_full_name: fullName || email.split('@')[0]
+      p_full_name: displayName  // Кирилицата отива в profiles таблицата
     })
     
     if (profileError || !profileResult.success) {
@@ -93,8 +94,8 @@ export const createNewManager = async (email, password, fullName = '') => {
     const { data: restaurant, error: restaurantError } = await supabase
       .from('restaurants')
       .insert({
-        name: `Ресторант ${email.split('@')[0]}`,
-        contact_email: email,
+        name: `Ресторант ${displayName}`,
+        contact_email: email.trim().toLowerCase(),
         active: true
       })
       .select()
@@ -180,20 +181,20 @@ export const resetManagerPassword = async (userId, newPassword) => {
 
 export const createSuperAdmin = async (email, password, fullName) => {
   try {
+    // NO cyrillic in user_metadata!
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: email,
+      email: email.trim().toLowerCase(),
       password: password,
-      email_confirm: true,
-      user_metadata: { full_name: fullName }
+      email_confirm: true
     })
 
     if (authError) throw authError
 
     const { data: profileResult } = await supabase.rpc('create_user_profile', {
       p_user_id: authData.user.id,
-      p_email: email,
+      p_email: email.trim().toLowerCase(),
       p_role: 'super_admin',
-      p_full_name: fullName
+      p_full_name: fullName  // Името се запазва в profiles таблицата
     })
 
     if (!profileResult.success) throw new Error(profileResult.error)
@@ -206,20 +207,20 @@ export const createSuperAdmin = async (email, password, fullName) => {
 
 export const createReportsAdmin = async (email, password, fullName) => {
   try {
+    // NO cyrillic in user_metadata!
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: email,
+      email: email.trim().toLowerCase(),
       password: password,
-      email_confirm: true,
-      user_metadata: { full_name: fullName }
+      email_confirm: true
     })
 
     if (authError) throw authError
 
     const { data: profileResult } = await supabase.rpc('create_user_profile', {
       p_user_id: authData.user.id,
-      p_email: email,
+      p_email: email.trim().toLowerCase(),
       p_role: 'reports_admin',
-      p_full_name: fullName
+      p_full_name: fullName  // Името се запазва в profiles таблицата
     })
 
     if (!profileResult.success) throw new Error(profileResult.error)
