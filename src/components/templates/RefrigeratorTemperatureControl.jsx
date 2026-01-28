@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
 import { Save, Plus, Trash2, Calendar, Thermometer, AlertCircle, FileText } from 'lucide-react';
 
 const RefrigeratorTemperatureControl = ({ template = {}, config = {}, department = {}, restaurantId, onBack }) => {
@@ -239,30 +240,27 @@ const RefrigeratorTemperatureControl = ({ template = {}, config = {}, department
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      // Simulation of save - замени с реален Supabase код
-      if (typeof supabase !== 'undefined') {
-        const { data: userData } = await supabase.auth.getUser();
-        
-        const submissionData = {
-          template_id: template.id,
-          restaurant_id: restaurantId,
-          department_id: department.id,
-          data: {
-            customColumns,
-            rows,
-            savedInspectors
-          },
-          submitted_by: userData.user.id,
-          submission_date: rows.find(r => r.date)?.date || new Date().toISOString().split('T')[0],
-          synced: true
-        };
+      const { data: userData } = await supabase.auth.getUser();
+      
+      const submissionData = {
+        template_id: template.id,
+        restaurant_id: restaurantId,
+        department_id: department.id,
+        data: {
+          customColumns,
+          rows,
+          savedInspectors
+        },
+        submitted_by: userData.user.id,
+        submission_date: rows.find(r => r.date)?.date || new Date().toISOString().split('T')[0],
+        synced: true
+      };
 
-        const { error } = await supabase
-          .from('checklist_submissions')
-          .insert(submissionData);
+      const { error } = await supabase
+        .from('checklist_submissions')
+        .insert(submissionData);
 
-        if (error) throw error;
-      }
+      if (error) throw error;
 
       // Изчистване на драфт и форма след успешно запазване
       const draftKey = `draft_${template.id}_${currentDate}`;

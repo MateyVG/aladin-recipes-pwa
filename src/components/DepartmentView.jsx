@@ -11,6 +11,7 @@ import ChickenMeatballProductionSheet from './templates/ChickenMeatballProductio
 import HygieneWorkCard from './templates/HygieneWorkCard'
 import RefrigeratorStorageControl from './templates/RefrigeratorStorageControl'
 import OilChangeChecklist from './templates/OilChangeChecklist'
+import IncomingMaterialsControl from './templates/IncomingMaterialsControl'
 import { useNavigationHistory } from '../hooks/useNavigationHistory'
 
 // Map component names to actual components
@@ -23,7 +24,8 @@ const TEMPLATE_COMPONENTS = {
   'ChickenMeatballProductionSheet': ChickenMeatballProductionSheet,
   'HygieneWorkCard': HygieneWorkCard,
   'RefrigeratorStorageControl': RefrigeratorStorageControl,
-  'OilChangeChecklist': OilChangeChecklist, 
+  'OilChangeChecklist': OilChangeChecklist,
+  'IncomingMaterialsControl': IncomingMaterialsControl,
 }
 
 const DepartmentView = ({ department, restaurantId, onBack }) => {
@@ -222,7 +224,7 @@ const DepartmentView = ({ department, restaurantId, onBack }) => {
                   {template.name}
                 </h3>
                 <p style={{
-                  margin: '0 0 20px 0',
+                  margin: '0 0 15px 0',
                   color: '#6b7280',
                   fontSize: '14px',
                   lineHeight: '1.5'
@@ -274,6 +276,55 @@ const ChecklistForm = ({ template, department, restaurantId, onBack }) => {
   const [loading, setLoading] = useState(false)
 
   const config = template.config
+
+  // CRITICAL FIX: Safety check - if config is missing or invalid
+  if (!config || !config.columns) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: '#f0f4f8', padding: '20px' }}>
+        <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+            padding: '30px',
+            textAlign: 'center'
+          }}>
+            <button
+              onClick={onBack}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#6b7280',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                marginBottom: '20px'
+              }}
+            >
+              ← Назад
+            </button>
+            <div style={{ fontSize: '48px', marginBottom: '20px' }}>⚠️</div>
+            <h2 style={{ color: '#dc2626', marginBottom: '10px' }}>Грешка в конфигурацията</h2>
+            <p style={{ color: '#6b7280', marginBottom: '20px' }}>
+              Този чек лист няма валидна конфигурация. Моля, свържете се с администратора.
+            </p>
+            <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#fef2f2', borderRadius: '8px', textAlign: 'left' }}>
+              <strong>Техническа информация:</strong>
+              <pre style={{ fontSize: '12px', color: '#991b1b', marginTop: '10px', whiteSpace: 'pre-wrap' }}>
+                {JSON.stringify({ 
+                  templateId: template.id, 
+                  templateName: template.name,
+                  configExists: !!config,
+                  hasColumns: config?.columns ? true : false,
+                  configValue: config
+                }, null, 2)}
+              </pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   useEffect(() => {
     const initialHeader = {}

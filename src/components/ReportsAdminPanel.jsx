@@ -218,6 +218,250 @@ const ReportsAdminPanel = ({ onBack }) => {
     const data = submission.data
     const name = submission.checklist_templates?.name || ''
 
+    // DEBUG: Логване на информация за submission
+    console.log('=== RENDER CHECKLIST DEBUG ===');
+    console.log('Template name:', name);
+    console.log('Template ID:', submission.template_id);
+    console.log('Data structure:', Object.keys(data));
+    console.log('Full submission:', submission);
+    console.log('=== END DEBUG ===');
+
+    // Контрол на работното облекло и хигиена на персонала
+    if (name.includes('облекло') || name.includes('хигиена на персонал')) {
+      console.log('Detected clothing/hygiene control template');
+      
+      const rows = data.rows || []
+      const header = data.header || {}
+      const filledRows = rows.filter(r => r.name || r.position)
+      
+      return (
+        <div>
+          <h4 style={{ margin: '0 0 15px 0', color: '#1a5d33' }}>
+            📋 Контрол на работното облекло и хигиена на персонала
+          </h4>
+          
+          {/* Header Info */}
+          <div style={{ 
+            marginBottom: '15px', 
+            padding: '12px', 
+            backgroundColor: '#f0fdf4',
+            borderRadius: '8px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '10px'
+          }}>
+            <div>
+              <strong>📅 Дата:</strong> {header.date ? new Date(header.date).toLocaleDateString('bg-BG') : 'Неизвестна'}
+            </div>
+            {header.manager && (
+              <div>
+                <strong>👤 Мениджър:</strong> {header.manager}
+              </div>
+            )}
+          </div>
+          
+          {/* Summary Stats */}
+          {filledRows.length > 0 && (
+            <div style={{ 
+              marginBottom: '15px', 
+              padding: '12px', 
+              backgroundColor: '#eff6ff',
+              borderRadius: '8px'
+            }}>
+              <strong>📊 Общо проверени служители:</strong> {filledRows.length}
+            </div>
+          )}
+          
+          {/* Employees Table */}
+          {filledRows.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {filledRows.map((row, idx) => {
+                const hasIssues = 
+                  row.wounds !== 'none' || 
+                  row.jewelry !== 'none' || 
+                  row.work_clothing !== 'clean' || 
+                  row.personal_hygiene !== 'good' ||
+                  row.health_status !== 'good';
+                
+                return (
+                  <div key={row.id || idx} style={{
+                    padding: '15px',
+                    backgroundColor: '#f9fafb',
+                    borderRadius: '8px',
+                    borderLeft: hasIssues ? '4px solid #f59e0b' : '4px solid #059669'
+                  }}>
+                    {/* Employee Header */}
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center',
+                      marginBottom: '10px',
+                      paddingBottom: '10px',
+                      borderBottom: '1px solid #e5e7eb'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ 
+                          fontSize: '16px', 
+                          fontWeight: '600',
+                          color: '#1a5d33'
+                        }}>
+                          #{row.number} {row.name}
+                        </span>
+                        {row.position && (
+                          <span style={{
+                            padding: '4px 8px',
+                            backgroundColor: '#e0e7ff',
+                            color: '#3730a3',
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                            fontWeight: '500'
+                          }}>
+                            {row.position}
+                          </span>
+                        )}
+                      </div>
+                      {row.checked_by && (
+                        <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                          ✓ Проверил: {row.checked_by}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Status Grid */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                      gap: '10px',
+                      marginBottom: row.corrective_actions ? '10px' : '0'
+                    }}>
+                      {/* Work Clothing */}
+                      <div style={{
+                        padding: '10px',
+                        backgroundColor: row.work_clothing === 'clean' ? '#d1fae5' : '#fee2e2',
+                        borderRadius: '6px'
+                      }}>
+                        <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
+                          👔 Работно облекло
+                        </div>
+                        <div style={{ 
+                          fontWeight: '600',
+                          color: row.work_clothing === 'clean' ? '#065f46' : '#991b1b'
+                        }}>
+                          {row.work_clothing === 'clean' ? '✅ Чисто' : 
+                           row.work_clothing === 'dirty' ? '❌ Мръсно' : 
+                           row.work_clothing || '-'}
+                        </div>
+                      </div>
+                      
+                      {/* Personal Hygiene */}
+                      <div style={{
+                        padding: '10px',
+                        backgroundColor: row.personal_hygiene === 'good' ? '#d1fae5' : '#fee2e2',
+                        borderRadius: '6px'
+                      }}>
+                        <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
+                          🧼 Лична хигиена
+                        </div>
+                        <div style={{ 
+                          fontWeight: '600',
+                          color: row.personal_hygiene === 'good' ? '#065f46' : '#991b1b'
+                        }}>
+                          {row.personal_hygiene === 'good' ? '✅ Добра' : 
+                           row.personal_hygiene === 'poor' ? '❌ Лоша' : 
+                           row.personal_hygiene || '-'}
+                        </div>
+                      </div>
+                      
+                      {/* Health Status */}
+                      <div style={{
+                        padding: '10px',
+                        backgroundColor: row.health_status === 'good' ? '#d1fae5' : '#fee2e2',
+                        borderRadius: '6px'
+                      }}>
+                        <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
+                          🏥 Здравословно състояние
+                        </div>
+                        <div style={{ 
+                          fontWeight: '600',
+                          color: row.health_status === 'good' ? '#065f46' : '#991b1b'
+                        }}>
+                          {row.health_status === 'good' ? '✅ Добро' : 
+                           row.health_status === 'sick' ? '❌ Болен' : 
+                           row.health_status || '-'}
+                        </div>
+                      </div>
+                      
+                      {/* Wounds */}
+                      <div style={{
+                        padding: '10px',
+                        backgroundColor: row.wounds === 'none' ? '#d1fae5' : '#fee2e2',
+                        borderRadius: '6px'
+                      }}>
+                        <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
+                          🩹 Рани/Порязвания
+                        </div>
+                        <div style={{ 
+                          fontWeight: '600',
+                          color: row.wounds === 'none' ? '#065f46' : '#991b1b'
+                        }}>
+                          {row.wounds === 'none' ? '✅ Няма' : 
+                           row.wounds === 'minor' ? '⚠️ Леки' : 
+                           row.wounds === 'major' ? '❌ Сериозни' : 
+                           row.wounds || '-'}
+                        </div>
+                      </div>
+                      
+                      {/* Jewelry */}
+                      <div style={{
+                        padding: '10px',
+                        backgroundColor: row.jewelry === 'none' ? '#d1fae5' : '#fee2e2',
+                        borderRadius: '6px'
+                      }}>
+                        <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
+                          💍 Бижута
+                        </div>
+                        <div style={{ 
+                          fontWeight: '600',
+                          color: row.jewelry === 'none' ? '#065f46' : '#991b1b'
+                        }}>
+                          {row.jewelry === 'none' ? '✅ Няма' : 
+                           row.jewelry === 'present' ? '❌ Има' : 
+                           row.jewelry || '-'}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Corrective Actions */}
+                    {row.corrective_actions && (
+                      <div style={{
+                        marginTop: '10px',
+                        padding: '10px',
+                        backgroundColor: '#fef3c7',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #f59e0b'
+                      }}>
+                        <strong style={{ fontSize: '13px', color: '#92400e' }}>
+                          📝 Коригиращи действия:
+                        </strong>
+                        <div style={{ marginTop: '4px', fontSize: '13px', color: '#78350f' }}>
+                          {row.corrective_actions}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <p style={{ color: '#6b7280', textAlign: 'center', padding: '20px' }}>
+              Няма записани проверки на служители
+            </p>
+          )}
+        </div>
+      )
+    }
+
     // Чек лист за подмяна на мазнината
     if (name.includes('мазнина')) {
       const filledRecords = data.records?.filter(r => r.date || r.quantity) || []
@@ -368,9 +612,12 @@ const ReportsAdminPanel = ({ onBack }) => {
     }
 
     // Работна карта за хигиенизиране
-    if (name.includes('хигиенизиране')) {
+    // По-гъвкаво търсене - включва "хигиен", "Хигиен", "работна карта"
+    if (name.toLowerCase().includes('хигиен') || name.includes('работна карта')) {
+      console.log('Detected hygiene work card template');
       const zones = data.zones || []
       const completionData = data.completionData || {}
+      const employees = data.employees || []
       const completedCount = Object.values(completionData).filter(v => v === true).length
       const totalCount = Object.keys(completionData).length
       
@@ -379,57 +626,125 @@ const ReportsAdminPanel = ({ onBack }) => {
           <h4 style={{ margin: '0 0 15px 0', color: '#1a5d33' }}>
             Хигиенизиране - {completedCount}/{totalCount} изпълнени
           </h4>
-          <div style={{
-            marginBottom: '15px',
-            padding: '10px',
-            backgroundColor: '#f0fdf4',
-            borderRadius: '8px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{
-                flex: 1,
-                height: '10px',
-                backgroundColor: '#e5e7eb',
-                borderRadius: '5px',
-                overflow: 'hidden'
-              }}>
-                <div style={{
-                  width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%`,
-                  height: '100%',
-                  backgroundColor: '#059669'
-                }} />
-              </div>
-              <span style={{ fontWeight: '600', color: '#059669' }}>
-                {totalCount > 0 ? ((completedCount / totalCount) * 100).toFixed(0) : 0}%
-              </span>
-            </div>
-          </div>
+          
+          {/* Manager Info */}
           {data.manager && (
-            <p style={{ color: '#6b7280', marginBottom: '10px' }}>👤 Мениджър: {data.manager}</p>
+            <div style={{ 
+              marginBottom: '15px', 
+              padding: '12px', 
+              backgroundColor: '#f0fdf4',
+              borderRadius: '8px'
+            }}>
+              <strong>👤 Мениджър:</strong> {data.manager}
+            </div>
           )}
+          
+          {/* Employees */}
+          {employees.length > 0 && (
+            <div style={{ 
+              marginBottom: '15px', 
+              padding: '12px', 
+              backgroundColor: '#eff6ff',
+              borderRadius: '8px'
+            }}>
+              <strong>👥 Служители:</strong>
+              <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {employees.map((emp, idx) => (
+                  <span key={idx} style={{
+                    padding: '4px 12px',
+                    backgroundColor: 'white',
+                    borderRadius: '4px',
+                    fontSize: '13px',
+                    border: '1px solid #dbeafe'
+                  }}>
+                    {emp.name || emp}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Progress Bar */}
+          {totalCount > 0 && (
+            <div style={{
+              marginBottom: '15px',
+              padding: '10px',
+              backgroundColor: '#f0fdf4',
+              borderRadius: '8px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  flex: 1,
+                  height: '10px',
+                  backgroundColor: '#e5e7eb',
+                  borderRadius: '5px',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%`,
+                    height: '100%',
+                    backgroundColor: '#059669'
+                  }} />
+                </div>
+                <span style={{ fontWeight: '600', color: '#059669' }}>
+                  {totalCount > 0 ? ((completedCount / totalCount) * 100).toFixed(0) : 0}%
+                </span>
+              </div>
+            </div>
+          )}
+          
+          {/* Zones */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {zones.map((zone, idx) => (
               <div key={idx} style={{
                 padding: '12px',
                 backgroundColor: '#f9fafb',
-                borderRadius: '8px'
+                borderRadius: '8px',
+                borderLeft: '4px solid #1a5d33'
               }}>
-                <div style={{ fontWeight: '600', marginBottom: '8px' }}>{zone.name}</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {zone.areas?.map((area, aIdx) => (
-                    <span key={aIdx} style={{
-                      padding: '4px 8px',
-                      backgroundColor: '#e5e7eb',
-                      borderRadius: '4px',
-                      fontSize: '12px'
-                    }}>
-                      {area.name}
-                    </span>
-                  ))}
+                <div style={{ fontWeight: '600', marginBottom: '8px', color: '#1a5d33' }}>
+                  {zone.name}
                 </div>
+                {zone.areas && zone.areas.length > 0 ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {zone.areas.map((area, aIdx) => {
+                      const areaKey = `${zone.id}_${area.name}`
+                      const isCompleted = completionData[areaKey]
+                      return (
+                        <span key={aIdx} style={{
+                          padding: '6px 10px',
+                          backgroundColor: isCompleted ? '#d1fae5' : '#e5e7eb',
+                          color: isCompleted ? '#065f46' : '#374151',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          border: isCompleted ? '1px solid #059669' : 'none'
+                        }}>
+                          {isCompleted && '✓ '}{area.name}
+                        </span>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '13px', color: '#6b7280' }}>
+                    Няма области
+                  </div>
+                )}
               </div>
             ))}
           </div>
+          
+          {/* Hygiene Type */}
+          {data.hygieneType && (
+            <div style={{ 
+              marginTop: '15px', 
+              padding: '10px', 
+              backgroundColor: '#fef3c7',
+              borderRadius: '8px',
+              fontSize: '13px'
+            }}>
+              <strong>🧹 Тип хигиенизация:</strong> {data.hygieneType}
+            </div>
+          )}
         </div>
       )
     }
