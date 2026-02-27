@@ -1,15 +1,17 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, Suspense, lazy } from 'react'
 import { supabase, createNewManager, resetManagerPassword } from './lib/supabase'
-import DepartmentView from './components/DepartmentView'
-import ReportsAdminPanel from './components/ReportsAdminPanel'
-import NotificationsPanel from './components/NotificationsPanel'
 import { NotificationBadge, NotificationSettings } from './components/NotificationBadge'
-import AllSubmissionsHistory from './components/AllSubmissionsHistory'
-import RecipesManager from './components/recipes/RecipesManager'
 import { useNavigationHistory } from './hooks/useNavigationHistory'
 import { LanguageProvider } from './context/LanguageContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
-import IncomingMaterialsControl from './components/templates/IncomingMaterialsControl'
+
+/* ═══ LAZY LOADED COMPONENTS ═══ */
+const DepartmentView = lazy(() => import('./components/DepartmentView'))
+const ReportsAdminPanel = lazy(() => import('./components/ReportsAdminPanel'))
+const NotificationsPanel = lazy(() => import('./components/NotificationsPanel'))
+const AllSubmissionsHistory = lazy(() => import('./components/AllSubmissionsHistory'))
+const RecipesManager = lazy(() => import('./components/recipes/RecipesManager'))
+const IncomingMaterialsControl = lazy(() => import('./components/templates/IncomingMaterialsControl'))
 
 /* ═══════════════════════════════════════════════════════════════
    DESIGN SYSTEM TOKENS
@@ -568,14 +570,24 @@ const Dashboard = ({ profile, onSignOut }) => {
     if (departments.length === 0 && restId) loadDepts()
   }
 
+  /* ═══ LAZY LOADING FALLBACK ═══ */
+  const LazyFallback = () => (
+    <div style={{ minHeight: '100vh', backgroundColor: DS.color.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 36, height: 36, border: `3px solid ${DS.color.borderLight}`, borderTop: `3px solid ${DS.color.primary}`, borderRadius: '50%', animation: 'ctrlSpin 0.8s linear infinite', margin: '0 auto 12px' }} />
+        <p style={{ fontFamily: DS.font, fontSize: '12px', color: DS.color.graphiteLight, fontWeight: 600 }}>Зареждане...</p>
+      </div>
+    </div>
+  )
+
   if (currentView === 'admin') return <SuperAdminPanel onBack={() => setCurrentView('dashboard')} />
-  if (currentView === 'reports') return <ReportsAdminPanel onBack={() => setCurrentView('dashboard')} />
-  if (currentView === 'notifications') return <NotificationsPanel onBack={() => setCurrentView('dashboard')} restaurantId={restId} userId={profile?.id} />
+  if (currentView === 'reports') return <Suspense fallback={<LazyFallback />}><ReportsAdminPanel onBack={() => setCurrentView('dashboard')} /></Suspense>
+  if (currentView === 'notifications') return <Suspense fallback={<LazyFallback />}><NotificationsPanel onBack={() => setCurrentView('dashboard')} restaurantId={restId} userId={profile?.id} /></Suspense>
   if (currentView === 'notification-settings') return <NotificationSettings onBack={() => setCurrentView('dashboard')} restaurantId={restId} />
-  if (currentView === 'all-history') return <AllSubmissionsHistory restaurantId={restId} onBack={() => setCurrentView('dashboard')} />
-  if (currentView === 'recipes') return <RecipesManager onBack={() => setCurrentView('dashboard')} />
-  if (currentView === 'incoming-control') return <IncomingMaterialsControl profile={profile} onBack={() => setCurrentView('dashboard')} />
-  if (showChecklists && selectedDepartment && profile?.role === 'manager') return <DepartmentView department={selectedDepartment} restaurantId={restId} onBack={() => { setSelectedDepartment(null); setShowChecklists(false) }} />
+  if (currentView === 'all-history') return <Suspense fallback={<LazyFallback />}><AllSubmissionsHistory restaurantId={restId} onBack={() => setCurrentView('dashboard')} /></Suspense>
+  if (currentView === 'recipes') return <Suspense fallback={<LazyFallback />}><RecipesManager onBack={() => setCurrentView('dashboard')} /></Suspense>
+  if (currentView === 'incoming-control') return <Suspense fallback={<LazyFallback />}><IncomingMaterialsControl profile={profile} onBack={() => setCurrentView('dashboard')} /></Suspense>
+  if (showChecklists && selectedDepartment && profile?.role === 'manager') return <Suspense fallback={<LazyFallback />}><DepartmentView department={selectedDepartment} restaurantId={restId} onBack={() => { setSelectedDepartment(null); setShowChecklists(false) }} /></Suspense>
 
   const roleLabel = profile?.role === 'super_admin' ? 'Super Admin' : profile?.role === 'reports_admin' ? 'Reports Admin' : 'Мениджър'
   const quickActions = []
