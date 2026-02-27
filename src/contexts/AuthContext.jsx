@@ -216,5 +216,6 @@ export const AuthProvider = ({ children }) => {
     hasRestaurant: !!profile?.restaurants
   }
 
+  
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

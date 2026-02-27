@@ -1,8 +1,119 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Save, Plus, Trash2, CheckSquare, Square, Building2, Calendar, Users, ClipboardCheck, CheckCircle, RotateCcw, FileText, AlertCircle } from 'lucide-react';
+import { 
+  Save, Plus, Trash2, CheckSquare, Square, Building2, Calendar, 
+  Users, ClipboardCheck, CheckCircle, RotateCcw, FileText, 
+  AlertCircle, ChevronLeft
+} from 'lucide-react';
 
+/* ═══════════════════════════════════════════════════════════════
+   DESIGN TOKENS
+   ═══════════════════════════════════════════════════════════════ */
+const DS = {
+  color: {
+    bg: '#ECEEED', surface: '#FFFFFF', surfaceAlt: '#F7F9F8',
+    primary: '#1B5E37', primaryLight: '#2D7A4F', primaryGlow: 'rgba(27,94,55,0.08)',
+    cardHeader: '#E8F5EE',
+    graphite: '#1E2A26', graphiteMed: '#3D4F48', graphiteLight: '#6B7D76', graphiteMuted: '#95A39D',
+    sage: '#A8BFB2', sageMuted: '#C5D5CB',
+    ok: '#1B8A50', okBg: '#E8F5EE',
+    warning: '#C47F17', danger: '#C53030',
+    pendingBg: '#F0F2F1',
+    border: '#D5DDD9', borderLight: '#E4EBE7',
+  },
+  font: "'DM Sans', system-ui, sans-serif",
+  radius: '0px',
+  shadow: {
+    sm: '0 1px 3px rgba(30,42,38,0.06),0 1px 2px rgba(30,42,38,0.04)',
+    md: '0 4px 12px rgba(30,42,38,0.06),0 1px 4px rgba(30,42,38,0.04)',
+    glow: '0 0 20px rgba(27,94,55,0.15),0 4px 12px rgba(30,42,38,0.06)',
+  },
+};
+
+const LOGO_URL = 'https://aladinfoods.bg/assets/images/aladinfoods_logo.png';
+
+const GLOBAL_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+  *, *::before, *::after { box-sizing: border-box; }
+  @keyframes ctrlFadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes ctrlBreathe { 0%,100%{box-shadow:${DS.shadow.glow}} 50%{box-shadow:0 0 24px rgba(27,94,55,0.25),0 4px 16px rgba(30,42,38,0.08)} }
+  @media (max-width: 767px) { input, button, select, textarea { font-size: 16px !important; } }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: ${DS.color.sage}; border-radius: 0; }
+`;
+
+const useResponsive = () => {
+  const [screen, setScreen] = useState({ w: window.innerWidth });
+  useEffect(() => {
+    const onResize = () => setScreen({ w: window.innerWidth });
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', () => setTimeout(onResize, 100));
+    return () => { window.removeEventListener('resize', onResize); window.removeEventListener('orientationchange', onResize); };
+  }, []);
+  return { isMobile: screen.w < 768, isTablet: screen.w >= 768 && screen.w < 1024 };
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   INPUT HELPERS
+   ═══════════════════════════════════════════════════════════════ */
+const inputBase = (focused) => ({
+  width: '100%', padding: '10px 12px',
+  backgroundColor: focused ? DS.color.surface : DS.color.surfaceAlt,
+  border: `1.5px solid ${focused ? DS.color.primary : DS.color.borderLight}`,
+  borderRadius: DS.radius, fontSize: '14px', fontFamily: DS.font, fontWeight: 400,
+  color: DS.color.graphite, outline: 'none', transition: 'all 150ms ease',
+  boxShadow: focused ? `0 0 0 3px ${DS.color.primaryGlow}` : 'none',
+  boxSizing: 'border-box', WebkitAppearance: 'none',
+});
+
+const ControlInput = ({ label, type = 'text', value, onChange, placeholder, style: s, ...rest }) => {
+  const [focused, setFocused] = useState(false);
+  return (
+    <div style={{ minWidth: 0, flex: 1 }}>
+      {label && (
+        <label style={{
+          display: 'block', fontFamily: DS.font, fontSize: '11px', fontWeight: 600,
+          color: focused ? DS.color.primary : DS.color.graphiteLight,
+          textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px',
+        }}>{label}</label>
+      )}
+      <input type={type} value={value} onChange={onChange} placeholder={placeholder}
+        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+        style={{ ...inputBase(focused), ...s }} {...rest} />
+    </div>
+  );
+};
+
+/* Badge за обозначения (Т, 2С, С, ПН, М) */
+const FreqBadge = ({ code }) => (
+  <span style={{
+    fontFamily: DS.font, fontWeight: 700, fontSize: '12px',
+    padding: '3px 8px', borderRadius: DS.radius,
+    backgroundColor: DS.color.okBg, color: DS.color.primary,
+    whiteSpace: 'nowrap',
+  }}>{code}</span>
+);
+
+/* Чекбокс бутон */
+const CheckBtn = ({ checked, onClick }) => (
+  <button onClick={onClick} style={{
+    background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
+    color: checked ? DS.color.primary : '#9CA3AF', display: 'flex',
+    minWidth: '32px', minHeight: '32px', alignItems: 'center', justifyContent: 'center',
+  }}>
+    {checked ?
+      <CheckSquare style={{ width: 22, height: 22 }} /> :
+      <Square style={{ width: 22, height: 22 }} />}
+  </button>
+);
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN COMPONENT — Логика 1:1 от оригинала
+   ═══════════════════════════════════════════════════════════════ */
 const HygieneWorkCard = ({ template, config, department, restaurantId, onBack }) => {
+  const { isMobile, isTablet } = useResponsive();
+
   const [loading, setLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
   const [hygieneType, setHygieneType] = useState('Т/ 2С / С / ПН / М');
@@ -10,52 +121,40 @@ const HygieneWorkCard = ({ template, config, department, restaurantId, onBack })
   const [autoSaveStatus, setAutoSaveStatus] = useState('');
   const [hasDraft, setHasDraft] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
-  
+  const [now, setNow] = useState(new Date());
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [syncStatus, setSyncStatus] = useState('');
+
   const [defaultZones] = useState([
-    {
-      id: '1',
-      name: '1. Зона за подготовка',
-      areas: [
-        { name: 'Под,сифони', cleaning: 'Т', washing: 'Т', disinfection: '2С' },
-        { name: 'Стени', cleaning: 'Т', washing: 'С', disinfection: 'ПН' },
-        { name: 'Таван', cleaning: 'С', washing: 'С', disinfection: 'ПН' },
-        { name: 'Врати', cleaning: 'Т', washing: 'Т', disinfection: 'ПН' },
-        { name: 'Контактниповърхности', cleaning: 'Т', washing: '2С', disinfection: '2С' }
-      ]
-    },
-    {
-      id: '2',
-      name: '2. Зона за готов продукт',
-      areas: [
-        { name: 'Под,сифони', cleaning: 'Т', washing: 'Т', disinfection: '2С' },
-        { name: 'Стени', cleaning: 'Т', washing: 'С', disinfection: 'ПН' },
-        { name: 'Таван', cleaning: 'С', washing: 'С', disinfection: 'ПН' },
-        { name: 'Врати', cleaning: 'Т', washing: 'Т', disinfection: 'ПН' },
-        { name: 'Контактни повърхности', cleaning: 'Т', washing: '2С', disinfection: '2С' }
-      ]
-    },
-    {
-      id: '3',
-      name: '3. Склад',
-      areas: [
-        { name: 'Под,сифони', cleaning: 'Т', washing: 'Т', disinfection: '2С' },
-        { name: 'Стени', cleaning: 'Т', washing: 'С', disinfection: 'ПН' },
-        { name: 'Таван', cleaning: 'С', washing: 'С', disinfection: 'ПН' },
-        { name: 'Врати', cleaning: 'Т', washing: 'Т', disinfection: 'ПН' },
-        { name: 'Контактни повърхности', cleaning: 'Т', washing: '2С', disinfection: '2С' }
-      ]
-    },
-    {
-      id: '4',
-      name: '4. Хладилна камера 1 (0° -4° С) - суровина',
-      areas: [
-        { name: 'Под', cleaning: 'Т', washing: 'Т', disinfection: '2С' },
-        { name: 'Стени', cleaning: 'Т', washing: 'С', disinfection: 'ПН' },
-        { name: 'Таван', cleaning: 'С', washing: 'С', disinfection: 'ПН' },
-        { name: 'Врата', cleaning: 'Т', washing: 'Т', disinfection: 'ПН' },
-        { name: 'Контактни повърхности и оборудване', cleaning: 'Т', washing: '2С', disinfection: '2С' }
-      ]
-    }
+    { id: '1', name: '1. Зона за подготовка', areas: [
+      { name: 'Под,сифони', cleaning: 'Т', washing: 'Т', disinfection: '2С' },
+      { name: 'Стени', cleaning: 'Т', washing: 'С', disinfection: 'ПН' },
+      { name: 'Таван', cleaning: 'С', washing: 'С', disinfection: 'ПН' },
+      { name: 'Врати', cleaning: 'Т', washing: 'Т', disinfection: 'ПН' },
+      { name: 'Контактниповърхности', cleaning: 'Т', washing: '2С', disinfection: '2С' }
+    ]},
+    { id: '2', name: '2. Зона за готов продукт', areas: [
+      { name: 'Под,сифони', cleaning: 'Т', washing: 'Т', disinfection: '2С' },
+      { name: 'Стени', cleaning: 'Т', washing: 'С', disinfection: 'ПН' },
+      { name: 'Таван', cleaning: 'С', washing: 'С', disinfection: 'ПН' },
+      { name: 'Врати', cleaning: 'Т', washing: 'Т', disinfection: 'ПН' },
+      { name: 'Контактни повърхности', cleaning: 'Т', washing: '2С', disinfection: '2С' }
+    ]},
+    { id: '3', name: '3. Склад', areas: [
+      { name: 'Под,сифони', cleaning: 'Т', washing: 'Т', disinfection: '2С' },
+      { name: 'Стени', cleaning: 'Т', washing: 'С', disinfection: 'ПН' },
+      { name: 'Таван', cleaning: 'С', washing: 'С', disinfection: 'ПН' },
+      { name: 'Врати', cleaning: 'Т', washing: 'Т', disinfection: 'ПН' },
+      { name: 'Контактни повърхности', cleaning: 'Т', washing: '2С', disinfection: '2С' }
+    ]},
+    { id: '4', name: '4. Хладилна камера 1 (0° -4° С) - суровина', areas: [
+      { name: 'Под', cleaning: 'Т', washing: 'Т', disinfection: '2С' },
+      { name: 'Стени', cleaning: 'Т', washing: 'С', disinfection: 'ПН' },
+      { name: 'Таван', cleaning: 'С', washing: 'С', disinfection: 'ПН' },
+      { name: 'Врата', cleaning: 'Т', washing: 'Т', disinfection: 'ПН' },
+      { name: 'Контактни повърхности и оборудване', cleaning: 'Т', washing: '2С', disinfection: '2С' }
+    ]}
   ]);
 
   const [refrigerators] = useState([
@@ -76,7 +175,37 @@ const HygieneWorkCard = ({ template, config, department, restaurantId, onBack })
 
   const allRefrigerators = [...refrigerators, ...customRefrigerators];
 
-  // Проверка дали има въведени данни
+  useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
+
+  // ─── Offline sync ───
+  const PENDING_KEY = `pending_submissions_${template.id}`;
+  const getPending = () => { try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); } catch { return []; } };
+  const savePendingQ = (q) => { localStorage.setItem(PENDING_KEY, JSON.stringify(q)); setPendingCount(q.length); };
+  const addToPending = (sub) => { const q = getPending(); q.push({ ...sub, savedAt: Date.now() }); savePendingQ(q); };
+
+  const syncPending = async () => {
+    const queue = getPending(); if (!queue.length) return;
+    setSyncStatus('syncing'); const failed = [];
+    for (const item of queue) {
+      try { const { savedAt, ...d } = item; const { error } = await supabase.from('checklist_submissions').insert(d); if (error) throw error; }
+      catch { failed.push(item); }
+    }
+    savePendingQ(failed);
+    if (!failed.length) { setSyncStatus('synced'); setAutoSaveStatus(`✓ ${queue.length} записа синхронизирани`); }
+    else { setSyncStatus('error'); setAutoSaveStatus(`⚠ ${failed.length} записа не са синхронизирани`); }
+    setTimeout(() => { setSyncStatus(''); setAutoSaveStatus(''); }, 4000);
+  };
+
+  useEffect(() => {
+    const goOn = () => { setIsOnline(true); syncPending(); };
+    const goOff = () => setIsOnline(false);
+    window.addEventListener('online', goOn); window.addEventListener('offline', goOff);
+    setPendingCount(getPending().length);
+    if (navigator.onLine && getPending().length > 0) syncPending();
+    return () => { window.removeEventListener('online', goOn); window.removeEventListener('offline', goOff); };
+  }, []);
+
+  // ─── hasAnyData ───
   const hasAnyData = () => {
     if (manager.trim() || hygieneType !== 'Т/ 2С / С / ПН / М' || employees.length > 0) return true;
     if (zones.length > defaultZones.length || customRefrigerators.length > 0) return true;
@@ -84,1224 +213,443 @@ const HygieneWorkCard = ({ template, config, department, restaurantId, onBack })
     return false;
   };
 
-  // Зареждане на драфт при старт
+  // ─── Драфт ───
   useEffect(() => {
-    const draftKey = `draft_${template.id}_${currentDate}`;
-    const savedDraft = localStorage.getItem(draftKey);
-    
-    if (savedDraft) {
+    const key = `draft_${template.id}_${currentDate}`;
+    const saved = localStorage.getItem(key);
+    if (saved) {
       setHasDraft(true);
       try {
-        const { 
-          hygieneType: draftHygieneType,
-          manager: draftManager,
-          employees: draftEmployees,
-          zones: draftZones,
-          customRefrigerators: draftCustomRefrigerators,
-          completionData: draftCompletionData,
-          timestamp 
-        } = JSON.parse(savedDraft);
-        const draftDate = new Date(timestamp);
-        
-        // Auto-load draft без да пита
-        setHygieneType(draftHygieneType || 'Т/ 2С / С / ПН / М');
-        setManager(draftManager || '');
-        setEmployees(draftEmployees || []);
-        setZones(draftZones || defaultZones);
-        setCustomRefrigerators(draftCustomRefrigerators || []);
-        setCompletionData(draftCompletionData || {});
-        setAutoSaveStatus(`Зареден драфт от ${draftDate.toLocaleString('bg-BG')}`);
+        const { hygieneType: ht, manager: m, employees: e, zones: z, customRefrigerators: cr, completionData: cd, timestamp } = JSON.parse(saved);
+        setHygieneType(ht || 'Т/ 2С / С / ПН / М'); setManager(m || '');
+        setEmployees(e || []); setZones(z || defaultZones);
+        setCustomRefrigerators(cr || []); setCompletionData(cd || {});
+        setAutoSaveStatus(`Зареден драфт от ${new Date(timestamp).toLocaleString('bg-BG')}`);
         setTimeout(() => setAutoSaveStatus(''), 5000);
-      } catch (e) {
-        console.error('Error loading draft:', e);
-      }
-    } else {
-      // Зареждане на запазени служители от предишни submissions
-      loadSavedEmployees();
-    }
+      } catch (e) { console.error('Error loading draft:', e); }
+    } else { loadSavedConfig(); }
   }, [template.id, currentDate]);
 
-  // Зареждане на запазени служители
-  const loadSavedEmployees = async () => {
+  const loadSavedConfig = async () => {
+    // Първо опитваме localStorage (бързо, работи offline)
     try {
-      const { data, error } = await supabase
-        .from('checklist_submissions')
-        .select('data')
-        .eq('template_id', template.id)
-        .eq('restaurant_id', restaurantId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (data?.data?.employees) {
-        setEmployees(data.data.employees);
+      const localConfig = localStorage.getItem(`config_${template.id}_${restaurantId}`);
+      if (localConfig) {
+        const { zones: savedZones, customRefrigerators: savedCR, employees: savedEmp } = JSON.parse(localConfig);
+        if (savedZones) setZones(savedZones);
+        if (savedCR) setCustomRefrigerators(savedCR);
+        if (savedEmp) setEmployees(savedEmp);
+        return; // Имаме локална конфигурация — не ходим до Supabase
       }
-    } catch (error) {
-      console.log('Няма предишни записи');
-    }
+    } catch { /* ignore parse errors */ }
+
+    // Fallback: зареждаме от последния submit в Supabase
+    try {
+      const { data } = await supabase.from('checklist_submissions').select('data')
+        .eq('template_id', template.id).eq('restaurant_id', restaurantId)
+        .order('created_at', { ascending: false }).limit(1).single();
+      if (data?.data) {
+        if (data.data.employees) setEmployees(data.data.employees);
+        if (data.data.zones) setZones(data.data.zones);
+        if (data.data.customRefrigerators) setCustomRefrigerators(data.data.customRefrigerators);
+        // Кешираме локално за следващия път
+        localStorage.setItem(`config_${template.id}_${restaurantId}`, JSON.stringify({
+          zones: data.data.zones || defaultZones,
+          customRefrigerators: data.data.customRefrigerators || [],
+          employees: data.data.employees || []
+        }));
+      }
+    } catch { console.log('Няма предишни записи — зареждат се defaults'); }
   };
 
-  // Auto-save draft на всеки 30 секунди
   useEffect(() => {
-    const interval = setInterval(() => {
-      saveDraft();
-    }, 30000);
-    
+    const interval = setInterval(() => saveDraft(), 30000);
     return () => clearInterval(interval);
   }, [hygieneType, manager, employees, zones, customRefrigerators, completionData]);
 
   const saveDraft = () => {
-    if (!hasAnyData()) return; // Не запазва празни драфти
-    
-    const draftKey = `draft_${template.id}_${currentDate}`;
-    localStorage.setItem(draftKey, JSON.stringify({
-      hygieneType,
-      manager,
-      employees,
-      zones,
-      customRefrigerators,
-      completionData,
-      timestamp: Date.now()
+    if (!hasAnyData()) return;
+    localStorage.setItem(`draft_${template.id}_${currentDate}`, JSON.stringify({
+      hygieneType, manager, employees, zones, customRefrigerators, completionData, timestamp: Date.now()
     }));
-    setHasDraft(true);
-    setAutoSaveStatus('✓ Автоматично запазено');
+    setHasDraft(true); setAutoSaveStatus('✓ Автоматично запазено');
     setTimeout(() => setAutoSaveStatus(''), 2000);
   };
 
   const clearDraft = () => {
     if (window.confirm('Сигурни ли сте, че искате да изчистите текущия драфт и да започнете нова работна карта?')) {
-      setHygieneType('Т/ 2С / С / ПН / М');
-      setManager('');
-      setEmployees([]);
-      setZones(defaultZones);
-      setCustomRefrigerators([]);
+      // Нулираме само данните от попълването, НЕ конфигурацията
+      setHygieneType('Т/ 2С / С / ПН / М'); setManager('');
       setCompletionData({});
-      
-      const draftKey = `draft_${template.id}_${currentDate}`;
-      localStorage.removeItem(draftKey);
-      setHasDraft(false);
-      
-      setAutoSaveStatus('Драфтът е изчистен. Започнете нова работна карта.');
+      // zones, customRefrigerators и employees остават!
+      localStorage.removeItem(`draft_${template.id}_${currentDate}`);
+      setHasDraft(false); setAutoSaveStatus('Драфтът е изчистен.');
       setTimeout(() => setAutoSaveStatus(''), 3000);
     }
   };
 
-  const handleBackClick = () => {
-    if (hasAnyData()) {
-      setShowExitConfirm(true);
-    } else {
-      onBack();
-    }
-  };
-
-  const confirmExit = (saveAndExit) => {
-    if (saveAndExit) {
-      saveDraft();
-      setAutoSaveStatus('Данните са запазени. Можете да продължите по-късно.');
-      setTimeout(() => {
-        onBack();
-      }, 1500);
-    } else {
-      onBack();
-    }
+  const handleBackClick = () => { hasAnyData() ? setShowExitConfirm(true) : onBack(); };
+  const confirmExit = (save) => {
+    if (save) { saveDraft(); setAutoSaveStatus('Данните са запазени.'); setTimeout(() => onBack(), 1500); }
+    else { onBack(); }
     setShowExitConfirm(false);
   };
 
+  // ─── Employee CRUD ───
   const addEmployee = () => {
     if (newEmployeeName.trim()) {
       setEmployees([...employees, { id: Date.now(), name: newEmployeeName.trim() }]);
       setNewEmployeeName('');
     }
   };
+  const removeEmployee = (id) => setEmployees(employees.filter(e => e.id !== id));
 
-  const removeEmployee = (id) => {
-    setEmployees(employees.filter(emp => emp.id !== id));
-  };
-
+  // ─── Zone / Refrigerator CRUD ───
   const addCustomZone = () => {
-    const newZone = {
-      id: Date.now().toString(),
-      name: `${zones.length + customRefrigerators.length + 1}. Нова зона`,
+    setZones([...zones, {
+      id: Date.now().toString(), name: `${zones.length + customRefrigerators.length + 1}. Нова зона`,
       areas: [
         { name: 'Под,сифони', cleaning: 'Т', washing: 'Т', disinfection: '2С' },
         { name: 'Стени', cleaning: 'Т', washing: 'С', disinfection: 'ПН' }
       ]
-    };
-    setZones([...zones, newZone]);
+    }]);
   };
-
   const addCustomRefrigerator = () => {
-    const newRefrigerator = {
-      id: Date.now().toString(),
-      name: `${zones.length + allRefrigerators.length + 1}.Нов хладилник`,
-      cleaning: 'Т',
-      washing: 'Т',
-      disinfection: 'ПН'
-    };
-    setCustomRefrigerators([...customRefrigerators, newRefrigerator]);
+    setCustomRefrigerators([...customRefrigerators, {
+      id: Date.now().toString(), name: `${zones.length + allRefrigerators.length + 1}.Нов хладилник`,
+      cleaning: 'Т', washing: 'Т', disinfection: 'ПН'
+    }]);
   };
+  const removeCustomZone = (id) => setZones(zones.filter(z => !defaultZones.find(dz => dz.id === z.id) && z.id !== id));
+  const removeCustomRefrigerator = (id) => setCustomRefrigerators(customRefrigerators.filter(r => r.id !== id));
+  const updateZoneName = (zId, n) => setZones(zones.map(z => z.id === zId ? { ...z, name: n } : z));
+  const updateRefrigeratorName = (rId, n) => setCustomRefrigerators(customRefrigerators.map(r => r.id === rId ? { ...r, name: n } : r));
 
-  const removeCustomZone = (id) => {
-    setZones(zones.filter(zone => !defaultZones.find(dz => dz.id === zone.id) && zone.id !== id));
-  };
-
-  const removeCustomRefrigerator = (id) => {
-    setCustomRefrigerators(customRefrigerators.filter(ref => ref.id !== id));
-  };
-
-  const updateZoneName = (zoneId, newName) => {
-    setZones(zones.map(zone => 
-      zone.id === zoneId ? { ...zone, name: newName } : zone
-    ));
-  };
-
-  const updateRefrigeratorName = (refId, newName) => {
-    setCustomRefrigerators(customRefrigerators.map(ref => 
-      ref.id === refId ? { ...ref, name: newName } : ref
-    ));
-  };
-
+  // ─── Completion data ───
   const handleCompletionChange = (itemId, areaName, field, value) => {
     const key = `${itemId}_${areaName || 'main'}_${field}`;
-    setCompletionData(prev => ({
-      ...prev,
-      [key]: value
-    }));
+    setCompletionData(prev => ({ ...prev, [key]: value }));
+  };
+  const isCompleted = (itemId, areaName, field) => completionData[`${itemId}_${areaName || 'main'}_${field}`] || false;
+  const getExecutor = (itemId, areaName) => completionData[`${itemId}_${areaName || 'main'}_executor`] || '';
+  const setExecutorVal = (itemId, areaName, executor) => {
+    setCompletionData(prev => ({ ...prev, [`${itemId}_${areaName || 'main'}_executor`]: executor }));
   };
 
-  const isCompleted = (itemId, areaName, field) => {
-    const key = `${itemId}_${areaName || 'main'}_${field}`;
-    return completionData[key] || false;
-  };
-
-  const getExecutor = (itemId, areaName) => {
-    const key = `${itemId}_${areaName || 'main'}_executor`;
-    return completionData[key] || '';
-  };
-
-  const setExecutor = (itemId, areaName, executor) => {
-    const key = `${itemId}_${areaName || 'main'}_executor`;
-    setCompletionData(prev => ({
-      ...prev,
-      [key]: executor
-    }));
-  };
-
+  // ─── Submit с offline ───
   const handleSubmit = async () => {
-    if (!hasAnyData()) {
-      alert('Моля попълнете поне едно поле преди да запазите работната карта.');
-      return;
-    }
-
+    if (!hasAnyData()) { alert('Моля попълнете поне едно поле.'); return; }
     setLoading(true);
-    try {
-      const { data: userData } = await supabase.auth.getUser();
-      
-      const submissionData = {
-        template_id: template.id,
-        restaurant_id: restaurantId,
-        department_id: department.id,
-        data: {
-          currentDate,
-          hygieneType,
-          manager,
-          employees,
-          zones,
-          customRefrigerators,
-          completionData
-        },
-        submitted_by: userData.user.id,
-        submission_date: currentDate,
-        synced: true
-      };
+    const sub = {
+      template_id: template.id, restaurant_id: restaurantId, department_id: department.id,
+      data: { currentDate, hygieneType, manager, employees, zones, customRefrigerators, completionData },
+      submission_date: currentDate, synced: true,
+    };
+    try { const { data: u } = await supabase.auth.getUser(); if (u?.user?.id) sub.submitted_by = u.user.id; } catch {}
 
-      const { error } = await supabase
-        .from('checklist_submissions')
-        .insert(submissionData);
+    // Запазваме конфигурацията в localStorage за бързо зареждане
+    const saveConfigLocally = () => {
+      localStorage.setItem(`config_${template.id}_${restaurantId}`, JSON.stringify({
+        zones, customRefrigerators, employees
+      }));
+    };
 
-      if (error) throw error;
-
-      // Изчисти драфт след успешно запазване
-      const draftKey = `draft_${template.id}_${currentDate}`;
-      localStorage.removeItem(draftKey);
-      setHasDraft(false);
-
-      alert('Работната карта е запазена успешно! Сега можете да започнете нова работна карта.');
-      
-      // Рестартирай формата за нов запис
+    const resetForm = () => {
+      // НЕ нулираме zones, customRefrigerators и employees — те са конфигурация!
       setHygieneType('Т/ 2С / С / ПН / М');
       setManager('');
-      setEmployees([]);
-      setZones(defaultZones);
-      setCustomRefrigerators([]);
       setCompletionData({});
-      
-      // Остава на страницата за нов запис
-    } catch (error) {
-      console.error('Submit error:', error);
-      alert('Грешка при запазване: ' + error.message);
-    } finally {
-      setLoading(false);
+      // Запазваме конфигурацията локално
+      saveConfigLocally();
+    };
+
+    if (!navigator.onLine) {
+      addToPending(sub); localStorage.removeItem(`draft_${template.id}_${currentDate}`);
+      setHasDraft(false); setAutoSaveStatus('📱 Запазено офлайн');
+      setTimeout(() => setAutoSaveStatus(''), 4000); resetForm(); setLoading(false); return;
     }
+    try {
+      const { error } = await supabase.from('checklist_submissions').insert(sub);
+      if (error) throw error;
+      localStorage.removeItem(`draft_${template.id}_${currentDate}`); setHasDraft(false);
+      setAutoSaveStatus('✓ Работната карта е запазена успешно');
+      setTimeout(() => setAutoSaveStatus(''), 3000); resetForm();
+      if (getPending().length > 0) syncPending();
+    } catch (err) {
+      console.error('Submit error:', err); addToPending(sub);
+      setAutoSaveStatus('⚠ Грешка — запазено офлайн'); setTimeout(() => setAutoSaveStatus(''), 4000); resetForm();
+    } finally { setLoading(false); }
   };
 
+  // ─── Table cell style helpers ───
+  const thStyle = { padding: '14px 16px', color: 'white', fontWeight: 700, fontFamily: DS.font, fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.02em', borderRight: '1px solid rgba(255,255,255,0.15)' };
+  const tdStyle = { padding: isMobile ? '10px' : '14px 16px', borderRight: `1px solid ${DS.color.borderLight}`, borderBottom: `1px solid ${DS.color.borderLight}`, fontFamily: DS.font, fontSize: '14px', verticalAlign: 'middle' };
+  const cellCenter = { ...tdStyle, textAlign: 'center' };
+
+  const executorSelect = (itemId, areaName) => (
+    <select value={getExecutor(itemId, areaName)} onChange={(e) => setExecutorVal(itemId, areaName, e.target.value)}
+      style={{
+        padding: '8px 10px', border: `1.5px solid ${DS.color.borderLight}`, borderRadius: DS.radius,
+        fontFamily: DS.font, fontWeight: 500, color: DS.color.primary, fontSize: '13px',
+        backgroundColor: DS.color.surfaceAlt, outline: 'none', cursor: 'pointer',
+        WebkitAppearance: 'none', MozAppearance: 'none', appearance: 'none',
+        backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2395A39D' stroke-width='1.5' fill='none'/%3E%3C/svg%3E")`,
+        backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', paddingRight: '26px',
+        maxWidth: isMobile ? '100%' : '160px', width: '100%',
+      }}>
+      <option value="">Избери</option>
+      {employees.map(emp => <option key={emp.id} value={emp.name}>{emp.name}</option>)}
+    </select>
+  );
+
+  const completionCell = (itemId, areaName, field, code) => (
+    <td style={cellCenter}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+        <FreqBadge code={code} />
+        <CheckBtn checked={isCompleted(itemId, areaName, field)}
+          onClick={() => handleCompletionChange(itemId, areaName, field, !isCompleted(itemId, areaName, field))} />
+      </div>
+    </td>
+  );
+
+  const pad = isMobile ? '12px' : '24px';
+
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#F4F6F8', padding: '20px' }}>
-      {/* Exit Confirmation Modal */}
-      {showExitConfirm && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            padding: '30px',
-            maxWidth: '500px',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-              <AlertCircle style={{ color: '#d97706', width: '24px', height: '24px' }} />
-              <h3 style={{ margin: 0, color: '#195E33' }}>Имате незапазени данни</h3>
-            </div>
-            <p style={{ marginBottom: '20px', color: '#374151', lineHeight: '1.6' }}>
-              Имате попълнени данни в работната карта. Какво искате да направите?
-            </p>
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setShowExitConfirm(false)}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#6b7280',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '600'
-                }}
-              >
-                Отказ
-              </button>
-              <button
-                onClick={() => confirmExit(false)}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#dc2626',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '600'
-                }}
-              >
-                Изход без запазване
-              </button>
-              <button
-                onClick={() => confirmExit(true)}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#195E33',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '600'
-                }}
-              >
-                Запази и излез
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+    <>
+      <style>{GLOBAL_CSS}</style>
+      <div style={{ minHeight: '100vh', backgroundColor: DS.color.bg, fontFamily: DS.font, color: DS.color.graphite, display: 'flex', flexDirection: 'column' }}>
 
-      <div style={{ maxWidth: '1600px', margin: '0 auto' }}>
-        
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <button onClick={handleBackClick} style={{
-            padding: '10px 20px',
-            backgroundColor: '#6b7280',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontWeight: '600'
-          }}>
-            ← Назад
-          </button>
-
-          {hasDraft && (
-            <button onClick={clearDraft} style={{
-              padding: '8px 16px',
-              backgroundColor: '#dc2626',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: '14px',
-              fontWeight: '600'
-            }}>
-              <RotateCcw style={{ width: '16px', height: '16px' }} />
-              Започни нова работна карта
-            </button>
-          )}
-        </div>
-
-        {/* Header */}
-        <div style={{
-          background: 'linear-gradient(135deg, #195E33, #2D7A4F)',
-          borderRadius: '12px',
-          marginBottom: '30px',
-          padding: '30px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-          color: 'white'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-            <div style={{ flex: 1, maxWidth: '800px' }}>
-              <h2 style={{ fontSize: '22px', fontWeight: 'bold', lineHeight: '1.4', margin: 0 }}>
-                РАБОТНА КАРТА ЗА ХИГИЕНИЗИРАНЕ НА ПРОИЗВОДСТВЕНИ ПОМЕЩЕНИЯ
-              </h2>
-              {hasDraft && (
-                <div style={{
-                  marginTop: '15px',
-                  backgroundColor: 'rgba(255,255,255,0.2)',
-                  padding: '10px 20px',
-                  borderRadius: '6px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  <FileText style={{ width: '20px', height: '20px' }} />
-                  <span style={{ fontSize: '14px', fontWeight: '600' }}>Работите по драфт</span>
-                </div>
-              )}
-            </div>
-            <div style={{
-              textAlign: 'right',
-              marginLeft: '32px',
-              backgroundColor: 'rgba(255,255,255,0.1)',
-              borderRadius: '12px',
-              padding: '24px'
-            }}>
-              <p style={{ fontWeight: 'bold', fontSize: '18px', margin: '0 0 8px 0' }}>
-                Код: ПРП 3.0.3
-              </p>
-              <p style={{ opacity: 0.8, margin: '0 0 8px 0' }}>Редакция: 00</p>
-              <p style={{ fontWeight: '600', fontSize: '16px', margin: 0 }}>Стр. 1 от 1</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Controls */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-          padding: '24px',
-          marginBottom: '30px',
-          border: '1px solid #E6F4EA'
-        }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-            gap: '24px',
-            marginBottom: autoSaveStatus ? '16px' : '0'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <Calendar style={{ width: '20px', height: '20px', color: '#195E33' }} />
-              <label style={{ fontWeight: '600', color: '#374151' }}>ДАТА:</label>
-              <input
-                type="date"
-                value={currentDate}
-                onChange={(e) => setCurrentDate(e.target.value)}
-                style={{
-                  padding: '10px',
-                  border: '2px solid #195E33',
-                  borderRadius: '8px',
-                  fontSize: '14px'
-                }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <ClipboardCheck style={{ width: '20px', height: '20px', color: '#195E33' }} />
-              <label style={{ fontWeight: '600', color: '#374151' }}>ВИД ХИГИЕНИЗИРАНЕ:</label>
-              <input
-                type="text"
-                value={hygieneType}
-                onChange={(e) => setHygieneType(e.target.value)}
-                style={{
-                  padding: '10px',
-                  border: '2px solid #195E33',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  minWidth: '150px'
-                }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <Building2 style={{ width: '20px', height: '20px', color: '#195E33' }} />
-              <label style={{ fontWeight: '600', color: '#374151' }}>Управител:</label>
-              <input
-                type="text"
-                value={manager}
-                onChange={(e) => setManager(e.target.value)}
-                placeholder="Име и фамилия"
-                style={{
-                  padding: '10px',
-                  border: '2px solid #195E33',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  minWidth: '200px'
-                }}
-              />
-            </div>
-          </div>
-
-          {autoSaveStatus && (
-            <div style={{ 
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              color: '#059669',
-              fontSize: '14px',
-              fontWeight: '600',
-              marginTop: '16px'
-            }}>
-              <CheckCircle style={{ width: '16px', height: '16px' }} />
-              {autoSaveStatus}
-            </div>
-          )}
-        </div>
-
-        {/* Employee Management */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-          padding: '24px',
-          marginBottom: '30px',
-          border: '1px solid #E6F4EA'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-            <Users style={{ width: '20px', height: '20px', color: '#195E33' }} />
-            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#195E33' }}>
-              Служители
-            </h3>
-          </div>
-          <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-            <input
-              type="text"
-              value={newEmployeeName}
-              onChange={(e) => setNewEmployeeName(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && addEmployee()}
-              placeholder="Име и фамилия на служител"
-              style={{
-                flex: 1,
-                padding: '10px',
-                border: '2px solid #195E33',
-                borderRadius: '8px',
-                fontSize: '14px'
-              }}
-            />
-            <button
-              onClick={addEmployee}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '10px 20px',
-                backgroundColor: 'white',
-                color: '#195E33',
-                border: '2px solid #195E33',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontWeight: '600'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.backgroundColor = '#195E33';
-                e.currentTarget.style.color = 'white';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.backgroundColor = 'white';
-                e.currentTarget.style.color = '#195E33';
-              }}
-            >
-              <Plus style={{ width: '16px', height: '16px' }} />
-              Добави
-            </button>
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-            {employees.map(employee => (
-              <div key={employee.id} style={{
-                padding: '10px 16px',
-                borderRadius: '20px',
-                backgroundColor: '#f9fafb',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                border: '1px solid #E6F4EA'
-              }}>
-                <span style={{ fontWeight: '600', color: '#195E33' }}>{employee.name}</span>
-                <button
-                  onClick={() => removeEmployee(employee.id)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#dc2626',
-                    cursor: 'pointer',
-                    padding: '4px'
-                  }}
-                >
-                  <Trash2 style={{ width: '16px', height: '16px' }} />
-                </button>
+        {/* ═══════ EXIT MODAL ═══════ */}
+        {showExitConfirm && (
+          <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(30,42,38,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
+            <div style={{ backgroundColor: DS.color.surface, borderRadius: DS.radius, padding: isMobile ? '24px 20px' : '32px', maxWidth: '480px', width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                <AlertCircle style={{ color: DS.color.warning, width: 20, height: 20 }} />
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Имате незапазени данни</h3>
               </div>
-            ))}
+              <p style={{ marginBottom: '20px', color: DS.color.graphiteMed, lineHeight: 1.6, fontSize: '14px' }}>Какво искате да направите?</p>
+              <div style={{ display: 'flex', gap: '8px', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'flex-end' }}>
+                {[
+                  { label: 'Отказ', bg: DS.color.pendingBg, color: DS.color.graphiteMed, action: () => setShowExitConfirm(false) },
+                  { label: 'Изход без запазване', bg: DS.color.danger, color: 'white', action: () => confirmExit(false) },
+                  { label: 'Запази и излез', bg: DS.color.primary, color: 'white', action: () => confirmExit(true) },
+                ].map((b, i) => (
+                  <button key={i} onClick={b.action} style={{ padding: '12px 16px', backgroundColor: b.bg, color: b.color, border: 'none', borderRadius: DS.radius, cursor: 'pointer', fontSize: '13px', fontWeight: 600, fontFamily: DS.font, width: isMobile ? '100%' : 'auto' }}>{b.label}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══════ TOP BAR ═══════ */}
+        <div style={{ backgroundColor: DS.color.graphite, padding: isMobile ? '8px 12px' : '10px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 12px rgba(0,0,0,0.15)', gap: '8px' }}>
+          <button onClick={handleBackClick} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: isMobile ? '8px 10px' : '6px 14px', backgroundColor: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: DS.radius, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontFamily: DS.font, fontSize: '12px', fontWeight: 600, minHeight: '36px' }}>
+            <ChevronLeft style={{ width: 14, height: 14 }} />{!isMobile && 'Назад'}
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: isOnline ? 'rgba(27,138,80,0.15)' : 'rgba(197,48,48,0.2)', padding: '4px 10px', borderRadius: DS.radius }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: isOnline ? '#1B8A50' : DS.color.danger, display: 'inline-block', boxShadow: isOnline ? '0 0 6px rgba(27,138,80,0.5)' : '0 0 6px rgba(197,48,48,0.5)' }} />
+              {!isMobile && <span style={{ fontFamily: DS.font, fontSize: '10px', fontWeight: 600, color: isOnline ? 'rgba(255,255,255,0.6)' : 'rgba(255,200,200,0.9)', textTransform: 'uppercase' }}>{isOnline ? 'Онлайн' : 'Офлайн'}</span>}
+              {pendingCount > 0 && <span style={{ backgroundColor: DS.color.warning, color: 'white', fontFamily: DS.font, fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '10px', minWidth: '16px', textAlign: 'center' }}>{pendingCount}</span>}
+            </div>
+            {autoSaveStatus && <span style={{ fontFamily: DS.font, fontSize: '11px', color: syncStatus === 'error' ? 'rgba(255,200,200,0.9)' : DS.color.ok, display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}><CheckCircle style={{ width: 12, height: 12 }} />{isMobile ? '✓' : autoSaveStatus}</span>}
+            {hasDraft && !isMobile && <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(255,255,255,0.08)', padding: '4px 10px', borderRadius: DS.radius }}><FileText style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.5)' }} /><span style={{ fontFamily: DS.font, fontSize: '10px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>Драфт</span></div>}
+            <span style={{ fontFamily: DS.font, fontSize: isMobile ? '11px' : '12px', fontWeight: 500, color: 'rgba(255,255,255,0.4)' }}>
+              {now.toLocaleString('bg-BG', { hour: '2-digit', minute: '2-digit', ...(isMobile ? {} : { second: '2-digit' }), day: '2-digit', month: '2-digit', ...(isMobile ? {} : { year: 'numeric' }), hour12: false })}
+            </span>
           </div>
         </div>
 
-        {/* Legend */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-          padding: '24px',
-          marginBottom: '30px',
-          border: '1px solid #E6F4EA'
-        }}>
-          <p style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '16px', color: '#195E33' }}>
-            Обозначения:
-          </p>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-            gap: '16px',
-            fontSize: '14px',
-            color: '#374151'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{
-                fontWeight: 'bold',
-                fontSize: '16px',
-                padding: '4px 8px',
-                borderRadius: '6px',
-                backgroundColor: '#E6F4EA',
-                color: '#195E33'
-              }}>Т</span>
-              <span>текущо</span>
+        {/* ═══════ MAIN ═══════ */}
+        <div style={{ maxWidth: '1600px', margin: '0 auto', padding: pad, flex: 1, width: '100%' }}>
+
+          {/* Header */}
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', marginBottom: isMobile ? '16px' : '24px', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '10px' : '14px' }}>
+              <img src={LOGO_URL} alt="Aladin Foods" style={{ height: isMobile ? '36px' : '48px', width: 'auto', objectFit: 'contain', flexShrink: 0 }} />
+              <div style={{ minWidth: 0 }}>
+                <h1 style={{ fontSize: isMobile ? '14px' : '20px', fontWeight: 700, color: DS.color.primary, margin: 0, textTransform: 'uppercase', fontFamily: DS.font, lineHeight: 1.3 }}>
+                  РАБОТНА КАРТА ЗА ХИГИЕНИЗИРАНЕ
+                </h1>
+                <p style={{ fontFamily: DS.font, fontSize: isMobile ? '10px' : '12px', color: DS.color.graphiteLight, fontWeight: 500, margin: '2px 0 0' }}>ПРОИЗВОДСТВЕНИ ПОМЕЩЕНИЯ</p>
+              </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{
-                fontWeight: 'bold',
-                fontSize: '16px',
-                padding: '4px 8px',
-                borderRadius: '6px',
-                backgroundColor: '#E6F4EA',
-                color: '#195E33'
-              }}>2С</span>
-              <span>два пъти на смяна</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{
-                fontWeight: 'bold',
-                fontSize: '16px',
-                padding: '4px 8px',
-                borderRadius: '6px',
-                backgroundColor: '#E6F4EA',
-                color: '#195E33'
-              }}>С</span>
-              <span>еженеседмично</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{
-                fontWeight: 'bold',
-                fontSize: '16px',
-                padding: '4px 8px',
-                borderRadius: '6px',
-                backgroundColor: '#E6F4EA',
-                color: '#195E33'
-              }}>ПН</span>
-              <span>при необходимост</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{
-                fontWeight: 'bold',
-                fontSize: '16px',
-                padding: '4px 8px',
-                borderRadius: '6px',
-                backgroundColor: '#E6F4EA',
-                color: '#195E33'
-              }}>М</span>
-              <span>ежемесечно</span>
+            <div style={{ backgroundColor: DS.color.surface, border: `1px solid ${DS.color.borderLight}`, borderRadius: DS.radius, padding: isMobile ? '8px 12px' : '10px 16px', display: 'flex', gap: isMobile ? '12px' : '16px', boxShadow: DS.shadow.sm, alignSelf: isMobile ? 'flex-start' : 'center' }}>
+              {[{ label: 'КОД', value: 'ПРП 3.0.3' }, { label: 'РЕД.', value: '00' }, { label: 'СТР.', value: '1/1' }].map((item, i) => (
+                <div key={i} style={{ textAlign: 'center' }}>
+                  <div style={{ fontFamily: DS.font, fontSize: '9px', fontWeight: 600, color: DS.color.graphiteMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>{item.label}</div>
+                  <div style={{ fontFamily: DS.font, fontSize: '12px', fontWeight: 700, color: DS.color.graphite }}>{item.value}</div>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
 
-        {/* Main Table */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-          overflow: 'hidden',
-          marginBottom: '30px',
-          border: '1px solid #E6F4EA'
-        }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ background: 'linear-gradient(135deg, #195E33, #2D7A4F)' }}>
-                  <th style={{
-                    padding: '16px',
-                    textAlign: 'left',
-                    fontWeight: 'bold',
-                    color: 'white',
-                    borderRight: '1px solid rgba(255,255,255,0.2)',
-                    fontSize: '16px'
-                  }}>
-                    Помещение/обект
-                  </th>
-                  <th style={{
-                    padding: '16px',
-                    textAlign: 'center',
-                    fontWeight: 'bold',
-                    color: 'white',
-                    borderRight: '1px solid rgba(255,255,255,0.2)',
-                    fontSize: '16px'
-                  }}>
-                    Почистване
-                  </th>
-                  <th style={{
-                    padding: '16px',
-                    textAlign: 'center',
-                    fontWeight: 'bold',
-                    color: 'white',
-                    borderRight: '1px solid rgba(255,255,255,0.2)',
-                    fontSize: '16px'
-                  }}>
-                    Измиване
-                  </th>
-                  <th style={{
-                    padding: '16px',
-                    textAlign: 'center',
-                    fontWeight: 'bold',
-                    color: 'white',
-                    borderRight: '1px solid rgba(255,255,255,0.2)',
-                    fontSize: '16px'
-                  }}>
-                    Дезинфекция
-                  </th>
-                  <th style={{
-                    padding: '16px',
-                    textAlign: 'center',
-                    fontWeight: 'bold',
-                    color: 'white',
-                    fontSize: '16px'
-                  }}>
-                    Извършил (подпис)
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {/* Zones */}
-                {zones.map((zone, zoneIndex) => (
-                  <React.Fragment key={zone.id}>
-                    {/* Zone Header */}
-                    <tr style={{ background: 'linear-gradient(135deg, #195E33, #2D7A4F)' }}>
-                      <td colSpan="5" style={{ padding: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <input
-                            type="text"
-                            value={zone.name}
-                            onChange={(e) => updateZoneName(zone.id, e.target.value)}
-                            style={{
-                              backgroundColor: 'rgba(255,255,255,0.1)',
-                              border: '1px solid rgba(255,255,255,0.2)',
-                              fontWeight: 'bold',
-                              flex: 1,
-                              padding: '12px',
-                              borderRadius: '8px',
-                              fontSize: '16px',
-                              color: 'white'
-                            }}
-                          />
-                          {!defaultZones.find(dz => dz.id === zone.id) && (
-                            <button
-                              onClick={() => removeCustomZone(zone.id)}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                color: 'rgba(255,100,100,0.9)',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              <Trash2 style={{ width: '20px', height: '20px' }} />
+          {/* Controls: Дата + Вид + Управител */}
+          <div style={{ backgroundColor: DS.color.surface, borderRadius: DS.radius, padding: pad, marginBottom: '16px', boxShadow: DS.shadow.sm, border: `1px solid ${DS.color.borderLight}`, display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '16px', alignItems: isMobile ? 'stretch' : 'flex-end', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ padding: '6px', borderRadius: DS.radius, backgroundColor: DS.color.okBg, flexShrink: 0 }}><Calendar style={{ width: 14, height: 14, color: DS.color.primary }} /></div>
+              <ControlInput label="Дата" type="date" value={currentDate} onChange={e => setCurrentDate(e.target.value)} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+              <div style={{ padding: '6px', borderRadius: DS.radius, backgroundColor: DS.color.okBg, flexShrink: 0 }}><ClipboardCheck style={{ width: 14, height: 14, color: DS.color.primary }} /></div>
+              <ControlInput label="Вид хигиенизиране" value={hygieneType} onChange={e => setHygieneType(e.target.value)} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+              <div style={{ padding: '6px', borderRadius: DS.radius, backgroundColor: DS.color.okBg, flexShrink: 0 }}><Building2 style={{ width: 14, height: 14, color: DS.color.primary }} /></div>
+              <ControlInput label="Управител" value={manager} onChange={e => setManager(e.target.value)} placeholder="Име и фамилия" />
+            </div>
+            {hasDraft && (
+              <button onClick={clearDraft} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px 14px', backgroundColor: 'transparent', border: `1.5px solid ${DS.color.danger}`, borderRadius: DS.radius, color: DS.color.danger, cursor: 'pointer', fontFamily: DS.font, fontSize: '12px', fontWeight: 600, minHeight: '40px', whiteSpace: 'nowrap' }}>
+                <RotateCcw style={{ width: 14, height: 14 }} />{isMobile ? 'Нова' : 'Нова работна карта'}
+              </button>
+            )}
+          </div>
+
+          {/* Служители */}
+          <div style={{ backgroundColor: DS.color.surface, borderRadius: DS.radius, padding: pad, marginBottom: '16px', boxShadow: DS.shadow.sm, border: `1px solid ${DS.color.borderLight}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+              <Users style={{ width: 16, height: 16, color: DS.color.primary }} />
+              <span style={{ fontFamily: DS.font, fontSize: '14px', fontWeight: 700, color: DS.color.primary, textTransform: 'uppercase' }}>Служители</span>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: employees.length ? '12px' : 0 }}>
+              <input type="text" value={newEmployeeName} onChange={e => setNewEmployeeName(e.target.value)}
+                onKeyPress={e => e.key === 'Enter' && addEmployee()} placeholder="Име и фамилия"
+                style={{ ...inputBase(false), flex: 1 }} />
+              <button onClick={addEmployee} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', backgroundColor: DS.color.primary, border: 'none', borderRadius: DS.radius, color: 'white', cursor: 'pointer', fontFamily: DS.font, fontSize: '12px', fontWeight: 600, minHeight: '40px' }}>
+                <Plus style={{ width: 14, height: 14 }} />Добави
+              </button>
+            </div>
+            {employees.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {employees.map(emp => (
+                  <div key={emp.id} style={{ padding: '8px 14px', borderRadius: DS.radius, backgroundColor: DS.color.okBg, display: 'flex', alignItems: 'center', gap: '10px', border: `1px solid ${DS.color.borderLight}` }}>
+                    <span style={{ fontFamily: DS.font, fontWeight: 600, color: DS.color.primary, fontSize: '13px' }}>{emp.name}</span>
+                    <button onClick={() => removeEmployee(emp.id)} style={{ background: 'none', border: 'none', color: DS.color.danger, cursor: 'pointer', padding: '2px', display: 'flex' }}>
+                      <Trash2 style={{ width: 14, height: 14 }} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Легенда */}
+          <div style={{ backgroundColor: DS.color.surface, borderRadius: DS.radius, padding: pad, marginBottom: '16px', boxShadow: DS.shadow.sm, border: `1px solid ${DS.color.borderLight}` }}>
+            <span style={{ fontFamily: DS.font, fontSize: '12px', fontWeight: 700, color: DS.color.primary, textTransform: 'uppercase', marginBottom: '10px', display: 'block' }}>Обозначения</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+              {[['Т', 'текущо'], ['2С', 'два пъти на смяна'], ['С', 'еженеседмично'], ['ПН', 'при необходимост'], ['М', 'ежемесечно']].map(([code, desc]) => (
+                <div key={code} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <FreqBadge code={code} />
+                  <span style={{ fontFamily: DS.font, fontSize: '13px', color: DS.color.graphiteMed }}>{desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ═══════ MAIN TABLE ═══════ */}
+          <div style={{ backgroundColor: DS.color.surface, borderRadius: DS.radius, boxShadow: DS.shadow.md, overflow: 'hidden', marginBottom: '16px', border: `1px solid ${DS.color.borderLight}` }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ backgroundColor: DS.color.primary }}>
+                    <th style={{ ...thStyle, textAlign: 'left', minWidth: '200px' }}>Помещение/обект</th>
+                    <th style={{ ...thStyle, textAlign: 'center', minWidth: '130px' }}>Почистване</th>
+                    <th style={{ ...thStyle, textAlign: 'center', minWidth: '130px' }}>Измиване</th>
+                    <th style={{ ...thStyle, textAlign: 'center', minWidth: '130px' }}>Дезинфекция</th>
+                    <th style={{ ...thStyle, textAlign: 'center', minWidth: '160px', borderRight: 'none' }}>Извършил</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {zones.map(zone => (
+                    <React.Fragment key={zone.id}>
+                      {/* Zone header */}
+                      <tr style={{ backgroundColor: DS.color.cardHeader }}>
+                        <td colSpan="5" style={{ padding: '12px 16px', borderBottom: `1px solid ${DS.color.borderLight}` }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <input type="text" value={zone.name} onChange={e => updateZoneName(zone.id, e.target.value)}
+                              style={{ flex: 1, padding: '8px 12px', borderRadius: DS.radius, fontFamily: DS.font, fontSize: '14px', fontWeight: 700, color: DS.color.primary, border: `1.5px solid ${DS.color.borderLight}`, backgroundColor: DS.color.surface, outline: 'none' }} />
+                            {!defaultZones.find(dz => dz.id === zone.id) && (
+                              <button onClick={() => removeCustomZone(zone.id)} style={{ background: 'none', border: 'none', color: DS.color.danger, cursor: 'pointer', padding: '4px', display: 'flex' }}>
+                                <Trash2 style={{ width: 16, height: 16 }} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                      {/* Zone areas */}
+                      {zone.areas.map((area, ai) => (
+                        <tr key={ai} style={{ backgroundColor: ai % 2 === 0 ? DS.color.surface : DS.color.surfaceAlt }}>
+                          <td style={{ ...tdStyle, fontWeight: 500, color: DS.color.primary, paddingLeft: '28px' }}>{area.name}</td>
+                          {completionCell(zone.id, area.name, 'cleaning', area.cleaning)}
+                          {completionCell(zone.id, area.name, 'washing', area.washing)}
+                          {completionCell(zone.id, area.name, 'disinfection', area.disinfection)}
+                          <td style={{ ...cellCenter, borderRight: 'none' }}>{executorSelect(zone.id, area.name)}</td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
+                  ))}
+
+                  {/* Refrigerators */}
+                  {allRefrigerators.map((ref, ri) => (
+                    <tr key={ref.id} style={{ backgroundColor: ri % 2 === 0 ? DS.color.surface : DS.color.surfaceAlt }}>
+                      <td style={tdStyle}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <input type="text" value={ref.name}
+                            onChange={e => customRefrigerators.find(cr => cr.id === ref.id) && updateRefrigeratorName(ref.id, e.target.value)}
+                            readOnly={!customRefrigerators.find(cr => cr.id === ref.id)}
+                            style={{ flex: 1, padding: '6px 10px', borderRadius: DS.radius, fontFamily: DS.font, fontSize: '14px', fontWeight: 500, color: DS.color.primary, border: customRefrigerators.find(cr => cr.id === ref.id) ? `1.5px solid ${DS.color.borderLight}` : 'none', backgroundColor: customRefrigerators.find(cr => cr.id === ref.id) ? DS.color.surface : 'transparent', outline: 'none' }} />
+                          {customRefrigerators.find(cr => cr.id === ref.id) && (
+                            <button onClick={() => removeCustomRefrigerator(ref.id)} style={{ background: 'none', border: 'none', color: DS.color.danger, cursor: 'pointer', padding: '4px', display: 'flex' }}>
+                              <Trash2 style={{ width: 14, height: 14 }} />
                             </button>
                           )}
                         </div>
                       </td>
+                      {completionCell(ref.id, null, 'cleaning', ref.cleaning)}
+                      {completionCell(ref.id, null, 'washing', ref.washing)}
+                      {completionCell(ref.id, null, 'disinfection', ref.disinfection)}
+                      <td style={{ ...cellCenter, borderRight: 'none' }}>{executorSelect(ref.id, null)}</td>
                     </tr>
-                    {/* Zone Areas */}
-                    {zone.areas.map((area, areaIndex) => (
-                      <tr key={areaIndex} style={{
-                        backgroundColor: areaIndex % 2 === 0 ? 'white' : '#FAFBFC'
-                      }}>
-                        <td style={{
-                          padding: '16px',
-                          borderRight: '1px solid #E6F4EA',
-                          fontSize: '15px',
-                          fontWeight: '500',
-                          color: '#195E33'
-                        }}>
-                          {area.name}
-                        </td>
-                        <td style={{
-                          padding: '16px',
-                          textAlign: 'center',
-                          borderRight: '1px solid #E6F4EA'
-                        }}>
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '12px'
-                          }}>
-                            <span style={{
-                              fontWeight: 'bold',
-                              fontSize: '16px',
-                              padding: '4px 8px',
-                              borderRadius: '6px',
-                              backgroundColor: '#E6F4EA',
-                              color: '#195E33'
-                            }}>
-                              {area.cleaning}
-                            </span>
-                            <button
-                              onClick={() => handleCompletionChange(zone.id, area.name, 'cleaning', !isCompleted(zone.id, area.name, 'cleaning'))}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                color: isCompleted(zone.id, area.name, 'cleaning') ? '#195E33' : '#9CA3AF'
-                              }}
-                            >
-                              {isCompleted(zone.id, area.name, 'cleaning') ? 
-                                <CheckSquare style={{ width: '24px', height: '24px' }} /> : 
-                                <Square style={{ width: '24px', height: '24px' }} />
-                              }
-                            </button>
-                          </div>
-                        </td>
-                        <td style={{
-                          padding: '16px',
-                          textAlign: 'center',
-                          borderRight: '1px solid #E6F4EA'
-                        }}>
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '12px'
-                          }}>
-                            <span style={{
-                              fontWeight: 'bold',
-                              fontSize: '16px',
-                              padding: '4px 8px',
-                              borderRadius: '6px',
-                              backgroundColor: '#E6F4EA',
-                              color: '#195E33'
-                            }}>
-                              {area.washing}
-                            </span>
-                            <button
-                              onClick={() => handleCompletionChange(zone.id, area.name, 'washing', !isCompleted(zone.id, area.name, 'washing'))}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                color: isCompleted(zone.id, area.name, 'washing') ? '#195E33' : '#9CA3AF'
-                              }}
-                            >
-                              {isCompleted(zone.id, area.name, 'washing') ? 
-                                <CheckSquare style={{ width: '24px', height: '24px' }} /> : 
-                                <Square style={{ width: '24px', height: '24px' }} />
-                              }
-                            </button>
-                          </div>
-                        </td>
-                        <td style={{
-                          padding: '16px',
-                          textAlign: 'center',
-                          borderRight: '1px solid #E6F4EA'
-                        }}>
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '12px'
-                          }}>
-                            <span style={{
-                              fontWeight: 'bold',
-                              fontSize: '16px',
-                              padding: '4px 8px',
-                              borderRadius: '6px',
-                              backgroundColor: '#E6F4EA',
-                              color: '#195E33'
-                            }}>
-                              {area.disinfection}
-                            </span>
-                            <button
-                              onClick={() => handleCompletionChange(zone.id, area.name, 'disinfection', !isCompleted(zone.id, area.name, 'disinfection'))}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                color: isCompleted(zone.id, area.name, 'disinfection') ? '#195E33' : '#9CA3AF'
-                              }}
-                            >
-                              {isCompleted(zone.id, area.name, 'disinfection') ? 
-                                <CheckSquare style={{ width: '24px', height: '24px' }} /> : 
-                                <Square style={{ width: '24px', height: '24px' }} />
-                              }
-                            </button>
-                          </div>
-                        </td>
-                        <td style={{ padding: '16px', textAlign: 'center' }}>
-                          <select
-                            value={getExecutor(zone.id, area.name)}
-                            onChange={(e) => setExecutor(zone.id, area.name, e.target.value)}
-                            style={{
-                              padding: '8px 12px',
-                              border: '2px solid #195E33',
-                              borderRadius: '8px',
-                              fontWeight: '500',
-                              color: '#195E33',
-                              fontSize: '14px'
-                            }}
-                          >
-                            <option value="">Избери</option>
-                            {employees.map(emp => (
-                              <option key={emp.id} value={emp.name}>{emp.name}</option>
-                            ))}
-                          </select>
-                        </td>
-                      </tr>
-                    ))}
-                  </React.Fragment>
-                ))}
-
-                {/* Refrigerators */}
-                {allRefrigerators.map((ref, refIndex) => (
-                  <tr key={ref.id} style={{
-                    backgroundColor: refIndex % 2 === 0 ? 'white' : '#FAFBFC'
-                  }}>
-                    <td style={{
-                      padding: '16px',
-                      borderRight: '1px solid #E6F4EA'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <input
-                          type="text"
-                          value={ref.name}
-                          onChange={(e) => customRefrigerators.find(cr => cr.id === ref.id) && updateRefrigeratorName(ref.id, e.target.value)}
-                          readOnly={!customRefrigerators.find(cr => cr.id === ref.id)}
-                          style={{
-                            flex: 1,
-                            padding: '8px',
-                            borderRadius: '8px',
-                            fontSize: '15px',
-                            fontWeight: '500',
-                            color: '#195E33',
-                            border: customRefrigerators.find(cr => cr.id === ref.id) ? '2px solid #195E33' : 'none',
-                            backgroundColor: customRefrigerators.find(cr => cr.id === ref.id) ? 'white' : 'transparent'
-                          }}
-                        />
-                        {customRefrigerators.find(cr => cr.id === ref.id) && (
-                          <button
-                            onClick={() => removeCustomRefrigerator(ref.id)}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              color: '#dc2626',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            <Trash2 style={{ width: '16px', height: '16px' }} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                    <td style={{
-                      padding: '16px',
-                      textAlign: 'center',
-                      borderRight: '1px solid #E6F4EA'
-                    }}>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '12px'
-                      }}>
-                        <span style={{
-                          fontWeight: 'bold',
-                          fontSize: '16px',
-                          padding: '4px 8px',
-                          borderRadius: '6px',
-                          backgroundColor: '#E6F4EA',
-                          color: '#195E33'
-                        }}>
-                          {ref.cleaning}
-                        </span>
-                        <button
-                          onClick={() => handleCompletionChange(ref.id, null, 'cleaning', !isCompleted(ref.id, null, 'cleaning'))}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            color: isCompleted(ref.id, null, 'cleaning') ? '#195E33' : '#9CA3AF'
-                          }}
-                        >
-                          {isCompleted(ref.id, null, 'cleaning') ? 
-                            <CheckSquare style={{ width: '24px', height: '24px' }} /> : 
-                            <Square style={{ width: '24px', height: '24px' }} />
-                          }
-                        </button>
-                      </div>
-                    </td>
-                    <td style={{
-                      padding: '16px',
-                      textAlign: 'center',
-                      borderRight: '1px solid #E6F4EA'
-                    }}>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '12px'
-                      }}>
-                        <span style={{
-                          fontWeight: 'bold',
-                          fontSize: '16px',
-                          padding: '4px 8px',
-                          borderRadius: '6px',
-                          backgroundColor: '#E6F4EA',
-                          color: '#195E33'
-                        }}>
-                          {ref.washing}
-                        </span>
-                        <button
-                          onClick={() => handleCompletionChange(ref.id, null, 'washing', !isCompleted(ref.id, null, 'washing'))}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            color: isCompleted(ref.id, null, 'washing') ? '#195E33' : '#9CA3AF'
-                          }}
-                        >
-                          {isCompleted(ref.id, null, 'washing') ? 
-                            <CheckSquare style={{ width: '24px', height: '24px' }} /> : 
-                            <Square style={{ width: '24px', height: '24px' }} />
-                          }
-                        </button>
-                      </div>
-                    </td>
-                    <td style={{
-                      padding: '16px',
-                      textAlign: 'center',
-                      borderRight: '1px solid #E6F4EA'
-                    }}>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '12px'
-                      }}>
-                        <span style={{
-                          fontWeight: 'bold',
-                          fontSize: '16px',
-                          padding: '4px 8px',
-                          borderRadius: '6px',
-                          backgroundColor: '#E6F4EA',
-                          color: '#195E33'
-                        }}>
-                          {ref.disinfection}
-                        </span>
-                        <button
-                          onClick={() => handleCompletionChange(ref.id, null, 'disinfection', !isCompleted(ref.id, null, 'disinfection'))}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            color: isCompleted(ref.id, null, 'disinfection') ? '#195E33' : '#9CA3AF'
-                          }}
-                        >
-                          {isCompleted(ref.id, null, 'disinfection') ? 
-                            <CheckSquare style={{ width: '24px', height: '24px' }} /> : 
-                            <Square style={{ width: '24px', height: '24px' }} />
-                          }
-                        </button>
-                      </div>
-                    </td>
-                    <td style={{ padding: '16px', textAlign: 'center' }}>
-                      <select
-                        value={getExecutor(ref.id, null)}
-                        onChange={(e) => setExecutor(ref.id, null, e.target.value)}
-                        style={{
-                          padding: '8px 12px',
-                          border: '2px solid #195E33',
-                          borderRadius: '8px',
-                          fontWeight: '500',
-                          color: '#195E33',
-                          fontSize: '14px'
-                        }}
-                      >
-                        <option value="">Избери</option>
-                        {employees.map(emp => (
-                          <option key={emp.id} value={emp.name}>{emp.name}</option>
-                        ))}
-                      </select>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
 
-        {/* Add New Items */}
-        <div style={{ display: 'flex', gap: '24px', marginBottom: '30px' }}>
-          <button
-            onClick={addCustomZone}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '12px 24px',
-              backgroundColor: 'white',
-              color: '#195E33',
-              border: '2px solid #195E33',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontWeight: '600',
-              fontSize: '14px'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = '#195E33';
-              e.currentTarget.style.color = 'white';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = 'white';
-              e.currentTarget.style.color = '#195E33';
-            }}
-          >
-            <Plus style={{ width: '16px', height: '16px' }} />
-            Добави зона
-          </button>
-          <button
-            onClick={addCustomRefrigerator}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '12px 24px',
-              backgroundColor: 'white',
-              color: '#195E33',
-              border: '2px solid #195E33',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontWeight: '600',
-              fontSize: '14px'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = '#195E33';
-              e.currentTarget.style.color = 'white';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = 'white';
-              e.currentTarget.style.color = '#195E33';
-            }}
-          >
-            <Plus style={{ width: '16px', height: '16px' }} />
-            Добави хладилник
-          </button>
+          {/* Add zone / refrigerator */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: isMobile ? '16px' : '24px', flexWrap: 'wrap' }}>
+            <button onClick={addCustomZone} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', backgroundColor: DS.color.primary, border: 'none', borderRadius: DS.radius, color: 'white', cursor: 'pointer', fontFamily: DS.font, fontSize: '12px', fontWeight: 600, minHeight: '40px' }}>
+              <Plus style={{ width: 14, height: 14 }} />Добави зона
+            </button>
+            <button onClick={addCustomRefrigerator} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', backgroundColor: DS.color.primary, border: 'none', borderRadius: DS.radius, color: 'white', cursor: 'pointer', fontFamily: DS.font, fontSize: '12px', fontWeight: 600, minHeight: '40px' }}>
+              <Plus style={{ width: 14, height: 14 }} />Добави хладилник
+            </button>
+          </div>
+
+          {/* Submit */}
+          <div style={{ backgroundColor: DS.color.surface, borderRadius: DS.radius, padding: pad, boxShadow: DS.shadow.md, border: `1px solid ${DS.color.borderLight}`, textAlign: 'center' }}>
+            <button onClick={handleSubmit} disabled={loading} style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+              padding: isMobile ? '14px 20px' : '16px 48px', width: isMobile ? '100%' : 'auto',
+              backgroundColor: loading ? DS.color.graphiteMuted : DS.color.primary,
+              border: 'none', borderRadius: DS.radius, color: 'white', cursor: loading ? 'not-allowed' : 'pointer',
+              fontFamily: DS.font, fontSize: isMobile ? '14px' : '16px', fontWeight: 600,
+              boxShadow: loading ? 'none' : '0 4px 12px rgba(25,94,51,0.3)',
+              animation: !loading && hasAnyData() ? 'ctrlBreathe 3s ease-in-out infinite' : 'none', minHeight: '48px',
+            }}>
+              <Save style={{ width: 20, height: 20 }} />
+              {loading ? 'Запазване...' : (isMobile ? 'Запази' : 'Запази работна карта и започни нова')}
+            </button>
+            <p style={{ marginTop: '10px', fontSize: '13px', color: DS.color.graphiteLight }}>След запазване формата се изчиства за нова карта</p>
+          </div>
         </div>
 
         {/* Footer */}
-        <div style={{
-          background: 'linear-gradient(135deg, #195E33, #2D7A4F)',
-          borderRadius: '12px',
-          padding: '24px',
-          color: 'white',
-          marginBottom: '30px'
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Calendar style={{ width: '20px', height: '20px' }} />
-              <span style={{ fontWeight: '600' }}>Дата: {currentDate}</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Building2 style={{ width: '20px', height: '20px' }} />
-              <span style={{ fontWeight: '600' }}>
-                Утвърждавам: {manager || '(Управител)'}
-              </span>
-            </div>
-          </div>
+        <div style={{ textAlign: 'center', padding: isMobile ? '16px 12px' : '20px 24px', color: DS.color.graphiteMuted, fontFamily: DS.font, fontSize: '11px', fontWeight: 500, borderTop: `1px solid ${DS.color.borderLight}`, marginTop: 'auto' }}>
+          © 2026 Aladin Foods | by MG
         </div>
-
-        {/* Submit Button */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '12px',
-          padding: '24px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-          textAlign: 'center'
-        }}>
-          <button
-            onClick={handleSubmit}
-            disabled={loading}
-            style={{
-              padding: '16px 48px',
-              backgroundColor: loading ? '#9ca3af' : '#195E33',
-              color: 'white',
-              border: 'none',
-              borderRadius: '10px',
-              fontSize: '16px',
-              fontWeight: '600',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '12px',
-              boxShadow: '0 4px 12px rgba(25, 94, 51, 0.3)'
-            }}
-          >
-            <Save style={{ width: '20px', height: '20px' }} />
-            {loading ? 'Запазване...' : 'Запази работна карта и започни нова'}
-          </button>
-          <p style={{ marginTop: '10px', fontSize: '14px', color: '#6b7280' }}>
-            След запазване, формата ще се изчисти и ще можете да започнете нова работна карта
-          </p>
-        </div>
-
       </div>
-    </div>
+    </>
   );
 };
 

@@ -1,1103 +1,799 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Save, Plus, Trash2, Calendar, Building2, Thermometer, AlertTriangle, AlertCircle, FileText } from 'lucide-react';
+import {
+  Save, Plus, Trash2, Calendar, Thermometer, AlertTriangle,
+  AlertCircle, FileText, CheckCircle, RotateCcw, ChevronLeft,
+  Snowflake, Edit3, User, Settings
+} from 'lucide-react';
 
+/* ═══════════════════════════════════════════════════════════════
+   DESIGN TOKENS
+   ═══════════════════════════════════════════════════════════════ */
+const DS = {
+  color: {
+    bg: '#ECEEED', surface: '#FFFFFF', surfaceAlt: '#F7F9F8',
+    primary: '#1B5E37', primaryLight: '#2D7A4F', primaryGlow: 'rgba(27,94,55,0.08)',
+    cardHeader: '#E8F5EE',
+    graphite: '#1E2A26', graphiteMed: '#3D4F48', graphiteLight: '#6B7D76', graphiteMuted: '#95A39D',
+    sage: '#A8BFB2', sageMuted: '#C5D5CB',
+    ok: '#1B8A50', okBg: '#E8F5EE',
+    warning: '#C47F17', warningBg: '#FEF3C7', warningBorder: '#F59E0B', warningText: '#92400E',
+    danger: '#C53030', dangerBg: '#FEF2F2',
+    pendingBg: '#F0F2F1',
+    border: '#D5DDD9', borderLight: '#E4EBE7',
+    cold: '#EFF6FF', coldAccent: '#3B82F6', coldText: '#1E40AF', coldGlow: 'rgba(59,130,246,0.08)',
+    freeze: '#F5F3FF', freezeAccent: '#8B5CF6', freezeText: '#5B21B6', freezeGlow: 'rgba(139,92,246,0.08)',
+  },
+  font: "'DM Sans', system-ui, sans-serif",
+  radius: '0px',
+  shadow: {
+    sm: '0 1px 3px rgba(30,42,38,0.06),0 1px 2px rgba(30,42,38,0.04)',
+    md: '0 4px 12px rgba(30,42,38,0.06),0 1px 4px rgba(30,42,38,0.04)',
+    lg: '0 8px 24px rgba(30,42,38,0.08),0 2px 8px rgba(30,42,38,0.04)',
+    glow: '0 0 20px rgba(27,94,55,0.15),0 4px 12px rgba(30,42,38,0.06)',
+  },
+};
+
+const LOGO_URL = 'https://aladinfoods.bg/assets/images/aladinfoods_logo.png';
+
+const GLOBAL_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+  *, *::before, *::after { box-sizing: border-box; }
+  @keyframes ctrlFadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes ctrlBreathe { 0%,100%{box-shadow:${DS.shadow.glow}} 50%{box-shadow:0 0 24px rgba(27,94,55,0.25),0 4px 16px rgba(30,42,38,0.08)} }
+  @keyframes warnPulse { 0%,100%{opacity:1} 50%{opacity:0.7} }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+  @keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+  @media (max-width: 767px) { input, button, select, textarea { font-size: 16px !important; } }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: ${DS.color.sage}; border-radius: 0; }
+  input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type=number] { -moz-appearance: textfield; }
+`;
+
+const useResponsive = () => {
+  const [w, setW] = useState(window.innerWidth);
+  useEffect(() => { const fn = () => setW(window.innerWidth); window.addEventListener('resize', fn); return () => window.removeEventListener('resize', fn); }, []);
+  return { isMobile: w < 768, isTablet: w >= 768 && w < 1024 };
+};
+
+const inputBase = (focused) => ({
+  width: '100%', padding: '10px 12px',
+  backgroundColor: focused ? DS.color.surface : DS.color.surfaceAlt,
+  border: `1.5px solid ${focused ? DS.color.primary : DS.color.borderLight}`,
+  borderRadius: DS.radius, fontSize: '14px', fontFamily: DS.font, fontWeight: 400,
+  color: DS.color.graphite, outline: 'none', transition: 'all 150ms ease',
+  boxShadow: focused ? `0 0 0 3px ${DS.color.primaryGlow}` : 'none',
+  boxSizing: 'border-box', WebkitAppearance: 'none',
+});
+
+const ControlInput = ({ label, type = 'text', value, onChange, placeholder, style: s, ...rest }) => {
+  const [f, setF] = useState(false);
+  return (
+    <div style={{ minWidth: 0, flex: 1 }}>
+      {label && <label style={{ display: 'block', fontFamily: DS.font, fontSize: '11px', fontWeight: 600, color: f ? DS.color.primary : DS.color.graphiteLight, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>{label}</label>}
+      <input type={type} value={value} onChange={onChange} placeholder={placeholder}
+        onFocus={() => setF(true)} onBlur={() => setF(false)}
+        style={{ ...inputBase(f), ...s }} {...rest} />
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   TEMP SLIDER — хоризонтален плъзгач с цветна зона
+   - Плъзгаш с пръст → live update
+   - Зелена зона = допустим диапазон
+   - Tap на числото → ръчен input
+   - Стъпка 0.1°C
+   ═══════════════════════════════════════════════════════════════ */
+const TempSlider = ({ label, value, onChange, isWarning, accentColor, glowColor, targetTemp, isMobile }) => {
+  const [manualMode, setManualMode] = useState(false);
+  const [manualVal, setManualVal] = useState('');
+  const sliderId = useRef(`ts_${Math.random().toString(36).slice(2, 8)}`).current;
+  const numVal = value !== '' ? parseFloat(value) : null;
+  const hasVal = numVal !== null && !isNaN(numVal);
+
+  // Parse target range
+  const parseRange = () => {
+    if (!targetTemp) return { lo: -5, hi: 10, okLo: 0, okHi: 4 };
+    const t = targetTemp.trim();
+    if (t.includes('≤') || t.toLowerCase().includes('до')) {
+      const m = t.match(/-?\d+\.?\d*/);
+      if (m) { const v = parseFloat(m[0]); return { lo: v - 12, hi: v + 8, okLo: v - 12, okHi: v }; }
+    }
+    if (t.includes('≥') || t.toLowerCase().includes('над')) {
+      const m = t.match(/-?\d+\.?\d*/);
+      if (m) { const v = parseFloat(m[0]); return { lo: v - 10, hi: v + 25, okLo: v, okHi: v + 25 }; }
+    }
+    const norm = t.replace(/°C/g, '').replace(/\s/g, '');
+    const rm = norm.match(/^(-?\d+\.?\d*)[-÷~](\d+\.?\d*)$/);
+    if (rm) {
+      const a = parseFloat(rm[1]), b = parseFloat(rm[2]);
+      const lo = Math.min(a, b), hi = Math.max(a, b);
+      const pad = Math.max((hi - lo) * 1.5, 5);
+      return { lo: lo - pad, hi: hi + pad, okLo: lo, okHi: hi };
+    }
+    return { lo: -5, hi: 10, okLo: 0, okHi: 4 };
+  };
+
+  const range = parseRange();
+  const sliderMin = Math.round(range.lo * 10) / 10;
+  const sliderMax = Math.round(range.hi * 10) / 10;
+
+  // OK zone position as percentage
+  const toPercent = (v) => ((v - sliderMin) / (sliderMax - sliderMin)) * 100;
+  const okLeft = Math.max(0, toPercent(range.okLo));
+  const okRight = Math.min(100, toPercent(range.okHi));
+  const thumbPos = hasVal ? Math.max(0, Math.min(100, toPercent(numVal))) : 50;
+
+  const handleSlider = (e) => {
+    const raw = parseFloat(e.target.value);
+    const rounded = Math.round(raw * 10) / 10;
+    onChange({ target: { value: String(rounded) } });
+  };
+
+  const enterManual = () => {
+    setManualVal(hasVal ? String(numVal) : '');
+    setManualMode(true);
+  };
+
+  const exitManual = () => {
+    if (manualVal.trim()) {
+      const parsed = parseFloat(manualVal);
+      if (!isNaN(parsed)) onChange({ target: { value: String(parsed) } });
+    }
+    setManualMode(false);
+  };
+
+  // Determine thumb color
+  const thumbColor = !hasVal ? DS.color.graphiteMuted : isWarning ? DS.color.danger : DS.color.ok;
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', minWidth: 0 }}>
+      {/* Label */}
+      <div style={{ fontFamily: DS.font, fontSize: '10px', fontWeight: 700, color: DS.color.graphiteMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</div>
+
+      {/* Temperature display — tap for manual */}
+      <div onClick={enterManual} style={{
+        padding: '6px 12px', borderRadius: DS.radius, cursor: 'pointer',
+        backgroundColor: isWarning ? DS.color.dangerBg : hasVal ? `${accentColor}10` : 'transparent',
+        border: `2px solid ${isWarning ? DS.color.danger : hasVal ? accentColor : DS.color.borderLight}`,
+        transition: 'all 200ms ease', minWidth: '72px', textAlign: 'center',
+      }}>
+        {manualMode ? (
+          <input type="number" step="0.1" value={manualVal}
+            onChange={e => setManualVal(e.target.value)}
+            onBlur={exitManual} onKeyDown={e => e.key === 'Enter' && exitManual()}
+            autoFocus
+            style={{
+              width: '60px', border: 'none', outline: 'none', textAlign: 'center',
+              fontFamily: DS.font, fontSize: '20px', fontWeight: 700,
+              color: DS.color.graphite, backgroundColor: 'transparent',
+              WebkitAppearance: 'none', MozAppearance: 'textfield',
+            }} />
+        ) : (
+          <span style={{
+            fontFamily: DS.font, fontSize: '20px', fontWeight: 700,
+            color: isWarning ? DS.color.danger : hasVal ? DS.color.graphite : DS.color.graphiteMuted,
+          }}>
+            {hasVal ? numVal.toFixed(1) : '—'}
+            {hasVal && <span style={{ fontSize: '11px', fontWeight: 600, color: DS.color.graphiteMuted, marginLeft: '1px' }}>°C</span>}
+          </span>
+        )}
+      </div>
+
+      {/* Slider track with OK zone */}
+      <div style={{ width: '100%', position: 'relative', height: '32px', display: 'flex', alignItems: 'center' }}>
+        {/* Track background */}
+        <div style={{
+          position: 'absolute', left: 0, right: 0, height: '8px', top: '50%', transform: 'translateY(-50%)',
+          backgroundColor: DS.color.borderLight, borderRadius: '4px', overflow: 'hidden',
+        }}>
+          {/* OK zone highlight */}
+          <div style={{
+            position: 'absolute', top: 0, bottom: 0,
+            left: `${okLeft}%`, width: `${okRight - okLeft}%`,
+            backgroundColor: 'rgba(27,138,80,0.25)', borderRadius: '4px',
+          }} />
+          {/* Filled track up to thumb */}
+          {hasVal && (
+            <div style={{
+              position: 'absolute', top: 0, bottom: 0, left: 0,
+              width: `${thumbPos}%`,
+              backgroundColor: `${thumbColor}40`,
+              borderRadius: '4px 0 0 4px',
+            }} />
+          )}
+        </div>
+
+        {/* Range input */}
+        <input type="range"
+          min={sliderMin} max={sliderMax} step={0.1}
+          value={hasVal ? numVal : (sliderMin + sliderMax) / 2}
+          onChange={handleSlider}
+          className={sliderId}
+          style={{
+            width: '100%', height: '32px', position: 'relative', zIndex: 2,
+            WebkitAppearance: 'none', appearance: 'none',
+            background: 'transparent', cursor: 'pointer',
+          }} />
+
+        {/* Scoped thumb styling */}
+        <style>{`
+          .${sliderId}::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none;
+            width: 26px; height: 26px; border-radius: 50%;
+            background: ${thumbColor};
+            border: 3px solid white;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.3);
+            cursor: pointer;
+          }
+          .${sliderId}::-moz-range-thumb {
+            width: 26px; height: 26px; border-radius: 50%;
+            background: ${thumbColor};
+            border: 3px solid white;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.3);
+            cursor: pointer;
+          }
+          .${sliderId}::-webkit-slider-runnable-track {
+            height: 8px; background: transparent; border-radius: 4px;
+          }
+          .${sliderId}::-moz-range-track {
+            height: 8px; background: transparent; border-radius: 4px;
+          }
+        `}</style>
+      </div>
+
+      {/* Min/Max labels */}
+      <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', padding: '0 2px' }}>
+        <span style={{ fontFamily: DS.font, fontSize: '9px', color: DS.color.graphiteMuted }}>{sliderMin}°</span>
+        <span style={{ fontFamily: DS.font, fontSize: '9px', color: DS.color.graphiteMuted }}>{sliderMax}°</span>
+      </div>
+
+      {/* Status */}
+      {isWarning && hasVal && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '3px', animation: 'warnPulse 2s infinite' }}>
+          <AlertTriangle style={{ width: 10, height: 10, color: DS.color.danger }} />
+          <span style={{ fontFamily: DS.font, fontSize: '9px', fontWeight: 700, color: DS.color.danger, textTransform: 'uppercase' }}>Извън норма!</span>
+        </div>
+      )}
+      {!isWarning && hasVal && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+          <CheckCircle style={{ width: 10, height: 10, color: DS.color.ok }} />
+          <span style={{ fontFamily: DS.font, fontSize: '9px', fontWeight: 600, color: DS.color.ok, textTransform: 'uppercase' }}>В норма</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   REFRIGERATOR CARD — като на снимката
+   ═══════════════════════════════════════════════════════════════ */
+const FridgeCard = ({
+  fridge, blockId, timeSlots, getReading, updateReading, getTemperatureStatus,
+  onUpdate, onRemove, isMobile, index, isEditing, onToggleEdit
+}) => {
+  const [hovered, setHovered] = useState(false);
+  const isNeg = fridge.type === 'negative';
+  const theme = isNeg
+    ? { bg: DS.color.freeze, accent: DS.color.freezeAccent, text: DS.color.freezeText, glow: DS.color.freezeGlow, Icon: Snowflake, typeLabel: 'Фризер' }
+    : { bg: DS.color.cold, accent: DS.color.coldAccent, text: DS.color.coldText, glow: DS.color.coldGlow, Icon: Thermometer, typeLabel: 'Хладилник' };
+
+  const hasAnyWarning = timeSlots.some(ts => getTemperatureStatus(getReading(blockId, `${fridge.id}_${ts}`), fridge.temp) === 'warning');
+
+  return (
+    <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{
+      backgroundColor: DS.color.surface, borderRadius: DS.radius,
+      border: `1.5px solid ${hasAnyWarning ? DS.color.danger : hovered ? theme.accent : DS.color.borderLight}`,
+      boxShadow: hovered ? DS.shadow.lg : DS.shadow.sm,
+      overflow: 'hidden', transition: 'all 200ms ease',
+      animation: 'ctrlFadeIn 300ms ease-out both', animationDelay: `${index * 60}ms`,
+    }}>
+      {/* ─── Header ─── */}
+      <div style={{
+        padding: isMobile ? '12px 14px' : '14px 18px',
+        backgroundColor: theme.bg,
+        borderBottom: `1px solid ${DS.color.borderLight}`,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+            <div style={{
+              width: 42, height: 42, borderRadius: DS.radius,
+              backgroundColor: DS.color.surface,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: `2px solid ${theme.accent}`, flexShrink: 0,
+            }}>
+              <theme.Icon style={{ width: 20, height: 20, color: theme.accent }} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {isEditing ? (
+                <input type="text" value={fridge.name} onChange={e => onUpdate(fridge.id, 'name', e.target.value)}
+                  style={{ fontFamily: DS.font, fontSize: '16px', fontWeight: 700, color: theme.text, border: `1px solid ${theme.accent}`, backgroundColor: DS.color.surface, borderRadius: DS.radius, padding: '4px 8px', width: '100%', outline: 'none' }} />
+              ) : (
+                <div style={{ fontFamily: DS.font, fontSize: '16px', fontWeight: 700, color: theme.text }}>{fridge.name}</div>
+              )}
+              <div style={{ fontFamily: DS.font, fontSize: '11px', color: DS.color.graphiteMuted, marginTop: '2px' }}>
+                {theme.typeLabel}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+            {/* Range badge */}
+            <div style={{
+              padding: '5px 12px', backgroundColor: DS.color.surface,
+              border: `2px solid ${theme.accent}`, borderRadius: DS.radius,
+              fontFamily: DS.font, fontSize: '12px', fontWeight: 700, color: theme.text,
+            }}>
+              {isEditing ? (
+                <input type="text" value={fridge.temp} onChange={e => onUpdate(fridge.id, 'temp', e.target.value)}
+                  style={{ fontFamily: DS.font, fontSize: '12px', fontWeight: 700, color: theme.text, border: 'none', backgroundColor: 'transparent', outline: 'none', width: '70px', textAlign: 'center', padding: 0 }} />
+              ) : (
+                <>Диапазон: {fridge.temp}</>
+              )}
+            </div>
+            {/* Edit toggle */}
+            <button onClick={() => onToggleEdit(fridge.id)} title={isEditing ? 'Готово' : 'Редактирай'}
+              style={{
+                background: isEditing ? theme.accent : 'transparent',
+                border: `1.5px solid ${theme.accent}`, cursor: 'pointer', padding: '6px',
+                color: isEditing ? 'white' : theme.accent,
+                borderRadius: DS.radius, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                minWidth: 32, minHeight: 32, transition: 'all 150ms ease',
+              }}>
+              <Settings style={{ width: 14, height: 14 }} />
+            </button>
+          </div>
+        </div>
+
+        {/* Edit mode: type select + description + remove */}
+        {isEditing && (
+          <div style={{
+            marginTop: '12px', padding: '12px', backgroundColor: DS.color.surface,
+            border: `1px solid ${DS.color.borderLight}`, borderRadius: DS.radius,
+            display: 'flex', flexDirection: 'column', gap: '10px',
+          }}>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '120px' }}>
+                <label style={{ fontFamily: DS.font, fontSize: '10px', fontWeight: 600, color: DS.color.graphiteLight, textTransform: 'uppercase', display: 'block', marginBottom: '3px' }}>Тип</label>
+                <select value={fridge.type} onChange={e => { const newType = e.target.value; onUpdate(fridge.id, '_batch', { type: newType, temp: newType === 'negative' ? '≤ -18°C' : '0-4°C' }); }}
+                  style={{ width: '100%', padding: '8px', borderRadius: DS.radius, border: `1.5px solid ${DS.color.borderLight}`, fontFamily: DS.font, fontSize: '13px', backgroundColor: DS.color.surfaceAlt, outline: 'none', cursor: 'pointer' }}>
+                  <option value="positive">Хладилник (+)</option>
+                  <option value="negative">Фризер (-)</option>
+                </select>
+              </div>
+              <div style={{ flex: 2, minWidth: '160px' }}>
+                <label style={{ fontFamily: DS.font, fontSize: '10px', fontWeight: 600, color: DS.color.graphiteLight, textTransform: 'uppercase', display: 'block', marginBottom: '3px' }}>Забележка (по избор)</label>
+                <input type="text" value={fridge.description || ''} onChange={e => onUpdate(fridge.id, 'description', e.target.value)}
+                  placeholder="Напр. зеленчуци, месни продукти..."
+                  style={{ ...inputBase(false), padding: '8px 10px', fontSize: '13px' }} />
+              </div>
+            </div>
+            <button onClick={() => onRemove(fridge.id)}
+              style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', backgroundColor: DS.color.dangerBg, border: `1px solid ${DS.color.danger}`, borderRadius: DS.radius, color: DS.color.danger, cursor: 'pointer', fontFamily: DS.font, fontSize: '12px', fontWeight: 600 }}>
+              <Trash2 style={{ width: 12, height: 12 }} />Премахни хладилник
+            </button>
+          </div>
+        )}
+
+        {/* Description if has one and not editing */}
+        {!isEditing && fridge.description && (
+          <div style={{ marginTop: '8px', fontFamily: DS.font, fontSize: '11px', color: DS.color.graphiteMuted, fontStyle: 'italic' }}>
+            {fridge.description}
+          </div>
+        )}
+      </div>
+
+      {/* ─── Temperature readings — big numbers ─── */}
+      <div style={{
+        padding: isMobile ? '16px 12px' : '20px 18px',
+        display: 'flex', gap: isMobile ? '8px' : '16px',
+        justifyContent: 'center',
+      }}>
+        {timeSlots.map(ts => {
+          const reading = getReading(blockId, `${fridge.id}_${ts}`);
+          const isWarn = getTemperatureStatus(reading, fridge.temp) === 'warning';
+          return (
+            <TempSlider key={ts}
+              label={ts.replace('h', ':00')}
+              value={reading}
+              onChange={e => updateReading(blockId, `${fridge.id}_${ts}`, e.target.value)}
+              isWarning={isWarn}
+              accentColor={theme.accent}
+              glowColor={theme.glow}
+              targetTemp={fridge.temp}
+              isMobile={isMobile}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+   ═══════════════════════════════════════════════════════════════ */
 const RefrigeratorStorageControl = ({ template, config, department, restaurantId, onBack }) => {
+  const { isMobile, isTablet } = useResponsive();
+
   const [loading, setLoading] = useState(false);
-  
-  const [defaultRefrigerators] = useState([
-    { id: '1', name: '№ 1', temp: '0-4°C', description: 'Дюнер 1', type: 'positive' },
-    { id: '2', name: '№ 2', temp: '0-4°C', description: 'зеленчуци, сосове, месни продукти', type: 'positive' },
-    { id: '3', name: '№ 3', temp: '2-6°C', description: 'безалкохолни напитки, айран', type: 'positive' },
-    { id: '4', name: '№ 4', temp: '≤ -18°C', description: 'месни продукти', type: 'negative' },
-    { id: '5', name: '№ 5', temp: '0-4°C', description: 'месни, млечни, зеленчуци, тесто', type: 'positive' },
-    { id: '6', name: '№ 6', temp: '0-4°C', description: 'месни, млечни, зеленчуци, тесто', type: 'positive' },
-    { id: '7', name: '№ 7', temp: '≤ -18°C', description: 'месни продукти', type: 'negative' },
-    { id: '8', name: '№ 8', temp: '≤ -18°C', description: 'месни продукти, зеленчуци, тесто', type: 'negative' }
+  const [now, setNow] = useState(new Date());
+  const [autoSaveStatus, setAutoSaveStatus] = useState('');
+  const [hasDraft, setHasDraft] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [syncStatus, setSyncStatus] = useState('');
+  const [editingIds, setEditingIds] = useState(new Set());
+
+  /* Defaults — description е ПРАЗЕН сега, потребителят го попълва */
+  const [refrigerators, setRefrigerators] = useState([
+    { id: '1', name: '№1 - Хладилник', temp: '0-4°C', description: '', type: 'positive', _isCustom: false },
+    { id: '2', name: '№2 - Хладилник', temp: '0-4°C', description: '', type: 'positive', _isCustom: false },
+    { id: '3', name: '№3 - Хладилник', temp: '2-6°C', description: '', type: 'positive', _isCustom: false },
+    { id: '4', name: '№4 - Фризер', temp: '≤ -18°C', description: '', type: 'negative', _isCustom: false },
+    { id: '5', name: '№5 - Хладилник', temp: '0-4°C', description: '', type: 'positive', _isCustom: false },
+    { id: '6', name: '№6 - Хладилник', temp: '0-4°C', description: '', type: 'positive', _isCustom: false },
+    { id: '7', name: '№7 - Фризер', temp: '≤ -18°C', description: '', type: 'negative', _isCustom: false },
+    { id: '8', name: '№8 - Фризер', temp: '≤ -18°C', description: '', type: 'negative', _isCustom: false }
   ]);
-  
-  const [customRefrigerators, setCustomRefrigerators] = useState([]);
+
   const [dateBlocks, setDateBlocks] = useState([{ id: 1, date: '', readings: {} }]);
   const [savedInspectors, setSavedInspectors] = useState([]);
 
-  // Draft система
-  const [hasDraft, setHasDraft] = useState(false);
-  const [showExitConfirm, setShowExitConfirm] = useState(false);
-  const [autoSaveStatus, setAutoSaveStatus] = useState('');
-  const [pendingExit, setPendingExit] = useState(false);
-
   const currentDate = new Date().toISOString().split('T')[0];
-
-  const allRefrigerators = [...defaultRefrigerators, ...customRefrigerators];
   const timeSlots = ['8h', '14h', '20h'];
 
-  // Проверка дали има въведени данни
-  const hasAnyData = () => {
-    // Проверка за custom хладилници
-    if (customRefrigerators.length > 0) return true;
-    
-    // Проверка за попълнени дати или отчитания
-    return dateBlocks.some(block => 
-      block.date || 
-      Object.keys(block.readings).some(key => block.readings[key])
-    );
+  useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
+
+  const flash = (msg) => { setAutoSaveStatus(msg); setTimeout(() => setAutoSaveStatus(''), 3000); };
+
+  /* ─── Offline sync ─── */
+  const PENDING_KEY = `pending_submissions_${template.id}`;
+  const getPending = () => { try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); } catch { return []; } };
+  const savePendingQ = (q) => { localStorage.setItem(PENDING_KEY, JSON.stringify(q)); setPendingCount(q.length); };
+  const addToPending = (sub) => { const q = getPending(); q.push({ ...sub, savedAt: Date.now() }); savePendingQ(q); };
+  const syncPending = async () => {
+    const queue = getPending(); if (!queue.length) return;
+    setSyncStatus('syncing'); const failed = [];
+    for (const item of queue) { try { const { savedAt, ...d } = item; const { error } = await supabase.from('checklist_submissions').insert(d); if (error) throw error; } catch { failed.push(item); } }
+    savePendingQ(failed);
+    if (!failed.length) { setSyncStatus('synced'); flash(`✓ ${queue.length} синхронизирани`); }
+    else { setSyncStatus('error'); flash(`⚠ ${failed.length} не са синхронизирани`); }
+    setTimeout(() => setSyncStatus(''), 4000);
   };
-
-  // Запазване на драфт
-  const saveDraft = () => {
-    if (!hasAnyData()) return;
-
-    const draftKey = `draft_${template.id}_${currentDate}`;
-    const draftData = {
-      customRefrigerators,
-      dateBlocks,
-      savedInspectors,
-      timestamp: new Date().toISOString()
-    };
-
-    localStorage.setItem(draftKey, JSON.stringify(draftData));
-    setHasDraft(true);
-    
-    // Показване на статус
-    setAutoSaveStatus('✓ Автоматично запазено');
-    setTimeout(() => setAutoSaveStatus(''), 2000);
-  };
-
-  // Проверка за съществуващ драфт
-  const checkForDraft = () => {
-    const draftKey = `draft_${template.id}_${currentDate}`;
-    const savedDraft = localStorage.getItem(draftKey);
-
-    if (savedDraft) {
-      try {
-        const draftData = JSON.parse(savedDraft);
-        setCustomRefrigerators(draftData.customRefrigerators || []);
-        setDateBlocks(draftData.dateBlocks || [{ id: 1, date: '', readings: {} }]);
-        setSavedInspectors(draftData.savedInspectors || []);
-        setHasDraft(true);
-      } catch (error) {
-        console.error('Грешка при зареждане на драфт:', error);
-        localStorage.removeItem(draftKey);
-      }
-    }
-  };
-
-  // Изчистване на драфт и форма
-  const clearDraft = () => {
-    const draftKey = `draft_${template.id}_${currentDate}`;
-    localStorage.removeItem(draftKey);
-    
-    // Рестартиране на формата
-    setCustomRefrigerators([]);
-    setDateBlocks([{ id: 1, date: '', readings: {} }]);
-    
-    setHasDraft(false);
-    setAutoSaveStatus('Нова контролна карта стартирана');
-    setTimeout(() => setAutoSaveStatus(''), 2000);
-  };
-
-  // Обработка на натискане "Назад"
-  const handleBackClick = () => {
-    if (hasAnyData()) {
-      setShowExitConfirm(true);
-      setPendingExit(true);
-    } else {
-      if (onBack) onBack();
-    }
-  };
-
-  // Потвърждение за излизане
-  const confirmExit = (saveAndExit) => {
-    if (saveAndExit) {
-      saveDraft();
-    }
-    
-    setShowExitConfirm(false);
-    setPendingExit(false);
-    
-    if (onBack) onBack();
-  };
-
-  // Зареждане на драфт при mount
   useEffect(() => {
-    checkForDraft();
+    const goOn = () => { setIsOnline(true); syncPending(); }; const goOff = () => setIsOnline(false);
+    window.addEventListener('online', goOn); window.addEventListener('offline', goOff);
+    setPendingCount(getPending().length);
+    if (navigator.onLine && getPending().length > 0) syncPending();
+    return () => { window.removeEventListener('online', goOn); window.removeEventListener('offline', goOff); };
+  }, []);
+
+  /* ─── hasAnyData ─── */
+  const hasAnyData = () => dateBlocks.some(b => b.date || Object.keys(b.readings).some(k => b.readings[k]));
+
+  /* ─── Config: refrigerators + savedInspectors ─── */
+  const loadSavedConfig = async () => {
+    try {
+      const c = localStorage.getItem(`config_${template.id}_${restaurantId}`);
+      if (c) { const d = JSON.parse(c); if (d.refrigerators?.length) setRefrigerators(d.refrigerators); if (d.savedInspectors?.length) setSavedInspectors(d.savedInspectors); return; }
+    } catch {}
+    try {
+      const { data } = await supabase.from('checklist_submissions').select('data').eq('template_id', template.id).eq('restaurant_id', restaurantId).order('created_at', { ascending: false }).limit(1).single();
+      if (data?.data?.refrigerators?.length) { setRefrigerators(data.data.refrigerators); if (data.data.savedInspectors?.length) setSavedInspectors(data.data.savedInspectors);
+        localStorage.setItem(`config_${template.id}_${restaurantId}`, JSON.stringify({ refrigerators: data.data.refrigerators, savedInspectors: data.data.savedInspectors || [] })); }
+    } catch {}
+  };
+
+  const saveConfigLocally = () => {
+    localStorage.setItem(`config_${template.id}_${restaurantId}`, JSON.stringify({ refrigerators, savedInspectors }));
+  };
+
+  /* ─── Draft ─── */
+  useEffect(() => {
+    const key = `draft_${template.id}_${currentDate}`; const saved = localStorage.getItem(key);
+    if (saved) {
+      try { const d = JSON.parse(saved); if (d.refrigerators?.length) setRefrigerators(d.refrigerators); setDateBlocks(d.dateBlocks || [{ id: 1, date: '', readings: {} }]); setSavedInspectors(d.savedInspectors || []); setHasDraft(true); }
+      catch { localStorage.removeItem(key); }
+    } else loadSavedConfig();
   }, [template.id, currentDate]);
 
-  // Auto-save interval
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (hasAnyData()) {
-        saveDraft();
-      }
-    }, 30000); // 30 секунди
+  useEffect(() => { const i = setInterval(() => { if (hasAnyData()) saveDraft(); }, 30000); return () => clearInterval(i); }, [refrigerators, dateBlocks, savedInspectors]);
 
-    return () => clearInterval(interval);
-  }, [customRefrigerators, dateBlocks, savedInspectors, template.id, currentDate]);
+  const saveDraft = () => {
+    if (!hasAnyData()) return;
+    localStorage.setItem(`draft_${template.id}_${currentDate}`, JSON.stringify({ refrigerators, dateBlocks, savedInspectors, timestamp: Date.now() }));
+    setHasDraft(true); flash('✓ Автоматично запазено');
+  };
 
-  // Зареждане на запазени данни от предишни submissions
-  useEffect(() => {
-    const loadSavedData = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('checklist_submissions')
-          .select('data')
-          .eq('template_id', template.id)
-          .eq('restaurant_id', restaurantId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
+  const clearDraft = () => {
+    if (window.confirm('Изчистване на отчитанията?')) {
+      setDateBlocks([{ id: Date.now(), date: '', readings: {} }]);
+      localStorage.removeItem(`draft_${template.id}_${currentDate}`);
+      setHasDraft(false); flash('Нова контролна карта');
+    }
+  };
 
-        if (data?.data?.savedInspectors) {
-          setSavedInspectors(prev => {
-            const combined = [...new Set([...prev, ...data.data.savedInspectors])];
-            return combined;
-          });
-        }
-      } catch (error) {
-        console.log('Няма предишни записи');
-      }
-    };
+  const handleBackClick = () => { hasAnyData() ? setShowExitConfirm(true) : onBack?.(); };
+  const confirmExit = (save) => { if (save) saveDraft(); setShowExitConfirm(false); onBack?.(); };
 
-    loadSavedData();
-  }, [template.id, restaurantId]);
-
+  /* ─── Refrigerator CRUD — всички са editable, не само custom ─── */
   const addRefrigerator = () => {
-    const newRefrigerator = {
-      id: Date.now().toString(),
-      name: `№ ${allRefrigerators.length + 1}`,
-      temp: '0-4°C',
-      description: 'Нов хладилник',
-      type: 'positive'
-    };
-    setCustomRefrigerators([...customRefrigerators, newRefrigerator]);
-    
-    setAutoSaveStatus('Добавен нов хладилник');
-    setTimeout(() => setAutoSaveStatus(''), 2000);
+    const newId = Date.now().toString();
+    setRefrigerators([...refrigerators, { id: newId, name: `№${refrigerators.length + 1} - Хладилник`, temp: '0-4°C', description: '', type: 'positive', _isCustom: true }]);
+    setEditingIds(prev => new Set([...prev, newId]));
   };
 
   const removeRefrigerator = (id) => {
-    setCustomRefrigerators(customRefrigerators.filter(ref => ref.id !== id));
-    const updatedDateBlocks = dateBlocks.map(block => {
-      const newReadings = { ...block.readings };
-      timeSlots.forEach(time => {
-        delete newReadings[`${id}_${time}`];
-      });
-      return { ...block, readings: newReadings };
+    if (refrigerators.length <= 1) { alert('Трябва да имате поне 1 хладилник.'); return; }
+    if (!window.confirm('Сигурни ли сте, че искате да премахнете този хладилник?')) return;
+    setRefrigerators(refrigerators.filter(r => r.id !== id));
+    setDateBlocks(dateBlocks.map(b => {
+      const nr = { ...b.readings }; timeSlots.forEach(t => delete nr[`${id}_${t}`]); return { ...b, readings: nr };
+    }));
+    setEditingIds(prev => { const s = new Set(prev); s.delete(id); return s; });
+  };
+
+  const updateRefrigerator = (id, f, v) => {
+    if (f === '_batch') {
+      // Batch update — обновява няколко полета наведнъж
+      setRefrigerators(refrigerators.map(r => r.id === id ? { ...r, ...v } : r));
+    } else {
+      setRefrigerators(refrigerators.map(r => r.id === id ? { ...r, [f]: v } : r));
+    }
+  };
+
+  const toggleEdit = (id) => {
+    setEditingIds(prev => {
+      const s = new Set(prev);
+      if (s.has(id)) {
+        s.delete(id);
+        // Запазваме конфигурацията при затваряне на edit mode
+        setTimeout(() => saveConfigLocally(), 0);
+      } else {
+        s.add(id);
+      }
+      return s;
     });
-    setDateBlocks(updatedDateBlocks);
-    
-    setAutoSaveStatus('Премахнат хладилник');
-    setTimeout(() => setAutoSaveStatus(''), 2000);
   };
 
-  const updateRefrigerator = (id, field, value) => {
-    setCustomRefrigerators(customRefrigerators.map(ref => 
-      ref.id === id ? { ...ref, [field]: value } : ref
-    ));
-  };
-
-  const addDateBlock = () => {
-    const newBlock = {
-      id: Date.now(),
-      date: '',
-      readings: {}
-    };
-    setDateBlocks([...dateBlocks, newBlock]);
-    
-    setAutoSaveStatus('Добавена нова дата');
-    setTimeout(() => setAutoSaveStatus(''), 2000);
-  };
-
-  const removeDateBlock = (id) => {
-    if (dateBlocks.length > 1) {
-      setDateBlocks(dateBlocks.filter(block => block.id !== id));
-      
-      setAutoSaveStatus('Премахната дата');
-      setTimeout(() => setAutoSaveStatus(''), 2000);
-    }
-  };
-
-  const updateDateBlock = (id, field, value) => {
-    setDateBlocks(dateBlocks.map(block => 
-      block.id === id ? { ...block, [field]: value } : block
-    ));
-  };
-
-  const updateReading = (blockId, key, value) => {
-    setDateBlocks(dateBlocks.map(block => 
-      block.id === blockId ? { 
-        ...block, 
-        readings: { ...block.readings, [key]: value }
-      } : block
-    ));
-    
-    if (key === 'inspector_name' && value.trim() && !savedInspectors.includes(value.trim())) {
-      setSavedInspectors([...savedInspectors, value.trim()]);
-    }
-  };
-
-  const getReading = (blockId, key) => {
-    const block = dateBlocks.find(b => b.id === blockId);
-    return block?.readings[key] || '';
-  };
+  /* ─── DateBlock CRUD ─── */
+  const addDateBlock = () => setDateBlocks([...dateBlocks, { id: Date.now(), date: '', readings: {} }]);
+  const removeDateBlock = (id) => { if (dateBlocks.length > 1) setDateBlocks(dateBlocks.filter(b => b.id !== id)); };
+  const updateDateBlock = (id, f, v) => setDateBlocks(dateBlocks.map(b => b.id === id ? { ...b, [f]: v } : b));
+  const updateReading = (bId, key, val) => { setDateBlocks(dateBlocks.map(b => b.id === bId ? { ...b, readings: { ...b.readings, [key]: val } } : b)); if (key === 'inspector_name' && val.trim() && !savedInspectors.includes(val.trim())) setSavedInspectors([...savedInspectors, val.trim()]); };
+  const getReading = (bId, key) => { const b = dateBlocks.find(bl => bl.id === bId); return b?.readings[key] || ''; };
 
   const getTemperatureStatus = (temp, targetTemp) => {
     if (!temp || !targetTemp) return 'normal';
-    
-    const tempValue = parseFloat(temp);
-    if (isNaN(tempValue)) return 'normal';
-    
-    if (targetTemp.includes('≤ -18°C')) {
-      return tempValue <= -18 ? 'normal' : 'warning';
-    } else if (targetTemp.includes('0-4°C')) {
-      return (tempValue >= 0 && tempValue <= 4) ? 'normal' : 'warning';
-    } else if (targetTemp.includes('2-6°C')) {
-      return (tempValue >= 2 && tempValue <= 6) ? 'normal' : 'warning';
+    const v = parseFloat(temp); if (isNaN(v)) return 'normal';
+    const t = targetTemp.trim();
+
+    // 1) ≤ число (напр. "≤ -18°C", "до -18°C") → стойността трябва ≤ число
+    if (t.includes('≤') || t.toLowerCase().includes('до')) {
+      const num = t.match(/-?\d+\.?\d*/);
+      if (num) return v <= parseFloat(num[0]) ? 'normal' : 'warning';
     }
-    
+
+    // 2) ≥ число (напр. "≥ 63°C", "над 63°C") → стойността трябва ≥ число
+    if (t.includes('≥') || t.toLowerCase().includes('над')) {
+      const num = t.match(/-?\d+\.?\d*/);
+      if (num) return v >= parseFloat(num[0]) ? 'normal' : 'warning';
+    }
+
+    // 3) Диапазон — парсваме внимателно
+    // Заменяме разделители (-, ÷, до, ~) с | за split
+    const normalized = t.replace(/°C/g, '').replace(/\s/g, '');
+    // Търсим pattern: число-разделител-число (напр. "0-4", "2÷6", "-2-4")
+    // Ключова идея: разделителят е тире МЕЖДУ две числа, не е минус
+    const rangeMatch = normalized.match(/^(-?\d+\.?\d*)[-÷~](\d+\.?\d*)$/);
+    if (rangeMatch) {
+      const lo = parseFloat(rangeMatch[1]);
+      const hi = parseFloat(rangeMatch[2]);
+      return (v >= Math.min(lo, hi) && v <= Math.max(lo, hi)) ? 'normal' : 'warning';
+    }
+
+    // Fallback: извличаме числа разделени с нечислови символи
+    const parts = t.replace(/[°C]/g, '').split(/[÷~\s]+/).filter(Boolean);
+    const numbers = [];
+    for (const p of parts) {
+      const n = parseFloat(p);
+      if (!isNaN(n)) numbers.push(n);
+    }
+    if (numbers.length >= 2) {
+      const lo = Math.min(...numbers);
+      const hi = Math.max(...numbers);
+      return (v >= lo && v <= hi) ? 'normal' : 'warning';
+    }
+
+    // Не можем да валидираме
     return 'normal';
   };
 
+  /* ─── Submit ─── */
   const handleSubmit = async () => {
+    if (!hasAnyData()) { alert('Моля попълнете поне едно поле.'); return; }
     setLoading(true);
-    try {
-      const { data: userData } = await supabase.auth.getUser();
-      
-      const submissionData = {
-        template_id: template.id,
-        restaurant_id: restaurantId,
-        department_id: department.id,
-        data: {
-          customRefrigerators,
-          dateBlocks,
-          savedInspectors
-        },
-        submitted_by: userData.user.id,
-        submission_date: dateBlocks[0]?.date || new Date().toISOString().split('T')[0],
-        synced: true
-      };
-
-      const { error } = await supabase
-        .from('checklist_submissions')
-        .insert(submissionData);
-
-      if (error) throw error;
-
-      // Изчистване на драфт и форма след успешно запазване
-      const draftKey = `draft_${template.id}_${currentDate}`;
-      localStorage.removeItem(draftKey);
-      setHasDraft(false);
-      
-      // Рестартиране на формата
-      setCustomRefrigerators([]);
-      setDateBlocks([{ id: 1, date: '', readings: {} }]);
-
-      alert('Контролната карта е запазена успешно! Сега можете да започнете нова контролна карта.');
-      
-      // НЕ извикваме onBack() - оставаме на страницата
-    } catch (error) {
-      console.error('Submit error:', error);
-      alert('Грешка при запазване: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
+    const sub = { template_id: template.id, restaurant_id: restaurantId, department_id: department.id, data: { refrigerators, dateBlocks, savedInspectors }, submission_date: dateBlocks[0]?.date || currentDate, synced: true };
+    try { const { data: u } = await supabase.auth.getUser(); if (u?.user?.id) sub.submitted_by = u.user.id; } catch {}
+    const resetForm = () => { setDateBlocks([{ id: Date.now(), date: '', readings: {} }]); localStorage.removeItem(`draft_${template.id}_${currentDate}`); setHasDraft(false); setEditingIds(new Set()); saveConfigLocally(); };
+    if (!navigator.onLine) { addToPending(sub); resetForm(); flash('📱 Запазено офлайн'); setLoading(false); return; }
+    try { const { error } = await supabase.from('checklist_submissions').insert(sub); if (error) throw error; resetForm(); flash('✓ Контролната карта е запазена'); if (getPending().length > 0) syncPending(); }
+    catch (err) { console.error(err); addToPending(sub); resetForm(); flash('⚠ Грешка — запазено офлайн'); }
+    finally { setLoading(false); }
   };
 
+  const pad = isMobile ? '12px' : '24px';
+
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#F4F6F8', padding: '20px' }}>
-      <div style={{ maxWidth: '1600px', margin: '0 auto' }}>
-        
-        <button onClick={handleBackClick} style={{
-          padding: '10px 20px',
-          backgroundColor: '#6b7280',
-          color: 'white',
-          border: 'none',
-          borderRadius: '8px',
-          cursor: 'pointer',
-          marginBottom: '20px',
-          fontWeight: '600'
-        }}>
-          ← Назад
-        </button>
+    <>
+      <style>{GLOBAL_CSS}</style>
+      <div style={{ minHeight: '100vh', backgroundColor: DS.color.bg, fontFamily: DS.font, color: DS.color.graphite, display: 'flex', flexDirection: 'column' }}>
 
-        {/* Exit Confirmation Modal */}
+        {/* EXIT MODAL */}
         {showExitConfirm && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}>
-            <div style={{
-              backgroundColor: 'white',
-              borderRadius: '12px',
-              padding: '32px',
-              maxWidth: '500px',
-              width: '90%',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                marginBottom: '20px'
-              }}>
-                <AlertCircle style={{ width: '24px', height: '24px', color: '#f59e0b' }} />
-                <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '600' }}>
-                  Имате незапазени данни
-                </h3>
-              </div>
-              
-              <p style={{ 
-                marginBottom: '24px', 
-                color: '#6b7280',
-                lineHeight: '1.6'
-              }}>
-                Какво желаете да направите с въведените данни?
-              </p>
-
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px'
-              }}>
-                <button
-                  onClick={() => setShowExitConfirm(false)}
-                  style={{
-                    padding: '12px 24px',
-                    backgroundColor: '#f3f4f6',
-                    color: '#374151',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontWeight: '600',
-                    fontSize: '15px'
-                  }}
-                >
-                  Отказ
-                </button>
-                
-                <button
-                  onClick={() => confirmExit(false)}
-                  style={{
-                    padding: '12px 24px',
-                    backgroundColor: '#dc2626',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontWeight: '600',
-                    fontSize: '15px'
-                  }}
-                >
-                  Изход без запазване
-                </button>
-                
-                <button
-                  onClick={() => confirmExit(true)}
-                  style={{
-                    padding: '12px 24px',
-                    backgroundColor: '#195E33',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontWeight: '600',
-                    fontSize: '15px'
-                  }}
-                >
-                  Запази и излез
-                </button>
+          <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(30,42,38,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
+            <div style={{ backgroundColor: DS.color.surface, borderRadius: DS.radius, padding: isMobile ? '24px 20px' : '32px', maxWidth: '480px', width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}><AlertCircle style={{ color: DS.color.warning, width: 20, height: 20 }} /><h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Имате незапазени данни</h3></div>
+              <p style={{ marginBottom: '20px', color: DS.color.graphiteMed, fontSize: '14px' }}>Какво искате да направите?</p>
+              <div style={{ display: 'flex', gap: '8px', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'flex-end' }}>
+                {[{ label: 'Отказ', bg: DS.color.pendingBg, color: DS.color.graphiteMed, action: () => setShowExitConfirm(false) }, { label: 'Изход без запазване', bg: DS.color.danger, color: 'white', action: () => confirmExit(false) }, { label: 'Запази и излез', bg: DS.color.primary, color: 'white', action: () => confirmExit(true) }].map((b, i) =>
+                  <button key={i} onClick={b.action} style={{ padding: '12px 16px', backgroundColor: b.bg, color: b.color, border: 'none', borderRadius: DS.radius, cursor: 'pointer', fontSize: '13px', fontWeight: 600, fontFamily: DS.font, width: isMobile ? '100%' : 'auto' }}>{b.label}</button>
+                )}
               </div>
             </div>
           </div>
         )}
 
-        {/* Header */}
-        <div style={{
-          background: 'linear-gradient(135deg, #195E33, #2D7A4F)',
-          borderRadius: '12px',
-          marginBottom: '30px',
-          padding: '30px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-          color: 'white',
-          position: 'relative'
-        }}>
-          {/* Draft индикатор */}
-          {hasDraft && (
-            <div style={{
-              position: 'absolute',
-              top: '20px',
-              right: '20px',
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-              padding: '8px 16px',
-              borderRadius: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: '14px',
-              fontWeight: '600',
-              backdropFilter: 'blur(10px)'
-            }}>
-              <FileText style={{ width: '16px', height: '16px' }} />
-              Работите по драфт
+        {/* TOP BAR */}
+        <div style={{ backgroundColor: DS.color.graphite, padding: isMobile ? '8px 12px' : '10px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 12px rgba(0,0,0,0.15)', gap: '8px' }}>
+          <button onClick={handleBackClick} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: isMobile ? '8px 10px' : '6px 14px', backgroundColor: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: DS.radius, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontFamily: DS.font, fontSize: '12px', fontWeight: 600, minHeight: '36px' }}>
+            <ChevronLeft style={{ width: 14, height: 14 }} />{!isMobile && 'Назад'}
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: isOnline ? 'rgba(27,138,80,0.15)' : 'rgba(197,48,48,0.2)', padding: '4px 10px', borderRadius: DS.radius }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: isOnline ? '#1B8A50' : DS.color.danger, display: 'inline-block', boxShadow: isOnline ? '0 0 6px rgba(27,138,80,0.5)' : '0 0 6px rgba(197,48,48,0.5)' }} />
+              {!isMobile && <span style={{ fontFamily: DS.font, fontSize: '10px', fontWeight: 600, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase' }}>{isOnline ? 'Онлайн' : 'Офлайн'}</span>}
+              {pendingCount > 0 && <span style={{ backgroundColor: DS.color.warning, color: 'white', fontFamily: DS.font, fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '10px' }}>{pendingCount}</span>}
             </div>
-          )}
-
-          {/* Auto-save индикатор */}
-          {autoSaveStatus && (
-            <div style={{
-              position: 'absolute',
-              bottom: '20px',
-              right: '20px',
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-              color: '#195E33',
-              padding: '8px 16px',
-              borderRadius: '8px',
-              fontSize: '13px',
-              fontWeight: '600',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-              animation: 'fadeIn 0.3s ease-in'
-            }}>
-              {autoSaveStatus}
-            </div>
-          )}
-
-          <div style={{ textAlign: 'center' }}>
-            <h2 style={{ fontSize: '28px', fontWeight: 'bold', lineHeight: '1.4', margin: '0 0 16px 0' }}>
-              КОНТРОЛНА КАРТА ХЛАДИЛНО СЪХРАНЕНИЕ
-            </h2>
-            <div style={{
-              display: 'inline-block',
-              backgroundColor: 'rgba(255,255,255,0.1)',
-              borderRadius: '8px',
-              padding: '12px 24px'
-            }}>
-              <p style={{ fontWeight: 'bold', fontSize: '14px', margin: '0 0 4px 0' }}>
-                Код: HCL 01
-              </p>
-              <p style={{ opacity: 0.8, margin: '0 0 4px 0', fontSize: '13px' }}>Редакция: 01</p>
-              <p style={{ fontWeight: '600', fontSize: '13px', margin: 0 }}>Стр. 1 от 1</p>
-            </div>
+            {autoSaveStatus && <span style={{ fontFamily: DS.font, fontSize: '11px', color: syncStatus === 'error' ? 'rgba(255,200,200,0.9)' : DS.color.ok, display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}><CheckCircle style={{ width: 12, height: 12 }} />{isMobile ? '✓' : autoSaveStatus}</span>}
+            {hasDraft && !isMobile && <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(255,255,255,0.08)', padding: '4px 10px', borderRadius: DS.radius }}><FileText style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.5)' }} /><span style={{ fontFamily: DS.font, fontSize: '10px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>Драфт</span></div>}
+            <span style={{ fontFamily: DS.font, fontSize: isMobile ? '11px' : '12px', fontWeight: 500, color: 'rgba(255,255,255,0.4)' }}>
+              {now.toLocaleString('bg-BG', { hour: '2-digit', minute: '2-digit', ...(isMobile ? {} : { second: '2-digit' }), day: '2-digit', month: '2-digit', ...(isMobile ? {} : { year: 'numeric' }), hour12: false })}
+            </span>
           </div>
         </div>
 
-        {/* Controls */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-          padding: '24px',
-          marginBottom: '30px',
-          border: '1px solid #E6F4EA'
-        }}>
-          <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <button
-              onClick={addRefrigerator}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '12px 24px',
-                backgroundColor: 'white',
-                color: '#195E33',
-                border: '2px solid #195E33',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontWeight: '600'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.backgroundColor = '#195E33';
-                e.currentTarget.style.color = 'white';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.backgroundColor = 'white';
-                e.currentTarget.style.color = '#195E33';
-              }}
-            >
-              <Plus style={{ width: '16px', height: '16px' }} />
-              Добави хладилник
-            </button>
-            
-            <button
-              onClick={addDateBlock}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '12px 24px',
-                backgroundColor: 'white',
-                color: '#195E33',
-                border: '2px solid #195E33',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontWeight: '600'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.backgroundColor = '#195E33';
-                e.currentTarget.style.color = 'white';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.backgroundColor = 'white';
-                e.currentTarget.style.color = '#195E33';
-              }}
-            >
-              <Calendar style={{ width: '16px', height: '16px' }} />
-              Добави дата
-            </button>
+        {/* MAIN */}
+        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: pad, flex: 1, width: '100%' }}>
 
-            {hasDraft && (
-              <button
-                onClick={clearDraft}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '12px 24px',
-                  backgroundColor: 'white',
-                  color: '#dc2626',
-                  border: '2px solid #dc2626',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontWeight: '600'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.backgroundColor = '#dc2626';
-                  e.currentTarget.style.color = 'white';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.backgroundColor = 'white';
-                  e.currentTarget.style.color = '#dc2626';
-                }}
-              >
-                <Trash2 style={{ width: '16px', height: '16px' }} />
-                Започни нова контролна карта
+          {/* Title */}
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', marginBottom: '20px', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <img src={LOGO_URL} alt="Aladin Foods" style={{ height: isMobile ? '36px' : '48px', width: 'auto', objectFit: 'contain' }} />
+              <div>
+                <h1 style={{ fontSize: isMobile ? '15px' : '22px', fontWeight: 700, color: DS.color.primary, margin: 0, textTransform: 'uppercase', fontFamily: DS.font }}>КОНТРОЛНА КАРТА</h1>
+                <p style={{ fontFamily: DS.font, fontSize: isMobile ? '10px' : '12px', color: DS.color.graphiteLight, margin: '2px 0 0' }}>ХЛАДИЛНО СЪХРАНЕНИЕ • Отчитане 8:00 / 14:00 / 20:00</p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button onClick={addRefrigerator} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', backgroundColor: DS.color.primary, border: 'none', borderRadius: DS.radius, color: 'white', cursor: 'pointer', fontFamily: DS.font, fontSize: '12px', fontWeight: 600, minHeight: '40px', boxShadow: DS.shadow.glow }}>
+                <Plus style={{ width: 14, height: 14 }} />Хладилник
               </button>
-            )}
+              <button onClick={addDateBlock} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', backgroundColor: DS.color.primary, border: 'none', borderRadius: DS.radius, color: 'white', cursor: 'pointer', fontFamily: DS.font, fontSize: '12px', fontWeight: 600, minHeight: '40px', boxShadow: DS.shadow.glow }}>
+                <Calendar style={{ width: 14, height: 14 }} />Дата
+              </button>
+              {hasDraft && (
+                <button onClick={clearDraft} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 14px', backgroundColor: 'transparent', border: `1.5px solid ${DS.color.danger}`, borderRadius: DS.radius, color: DS.color.danger, cursor: 'pointer', fontFamily: DS.font, fontSize: '12px', fontWeight: 600, minHeight: '40px' }}>
+                  <RotateCcw style={{ width: 14, height: 14 }} />{isMobile ? 'Нова' : 'Нова карта'}
+                </button>
+              )}
+              {editingIds.size > 0 && (
+                <button onClick={() => { saveConfigLocally(); setEditingIds(new Set()); flash('✓ Конфигурацията е запазена'); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', backgroundColor: '#2563EB', border: 'none', borderRadius: DS.radius, color: 'white', cursor: 'pointer', fontFamily: DS.font, fontSize: '12px', fontWeight: 600, minHeight: '40px', boxShadow: '0 0 12px rgba(37,99,235,0.2)' }}>
+                  <Save style={{ width: 14, height: 14 }} />{isMobile ? 'Запази' : 'Запази конфигурацията'}
+                </button>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Main Tables */}
-        {dateBlocks.map((block, blockIndex) => (
-          <div key={block.id} style={{
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-            overflow: 'hidden',
-            marginBottom: '30px',
-            border: '1px solid #E6F4EA'
-          }}>
-            <div style={{
-              padding: '16px',
-              backgroundColor: '#f9fafb',
-              borderBottom: '1px solid #E6F4EA'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <Calendar style={{ width: '20px', height: '20px', color: '#195E33' }} />
-                  <label style={{ fontWeight: '600', color: '#374151' }}>ДАТА:</label>
-                  <input
-                    type="date"
-                    value={block.date}
-                    onChange={(e) => updateDateBlock(block.id, 'date', e.target.value)}
-                    style={{
-                      padding: '10px',
-                      border: '2px solid #195E33',
-                      borderRadius: '8px'
-                    }}
-                  />
-                </div>
+          {/* DATE BLOCKS */}
+          {dateBlocks.map((block, bi) => (
+            <div key={block.id} style={{ marginBottom: '32px', animation: 'ctrlFadeIn 300ms ease-out both', animationDelay: `${bi * 100}ms` }}>
+
+              {/* Date bar */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 18px', marginBottom: '16px', backgroundColor: DS.color.graphite, borderRadius: DS.radius }}>
+                <Calendar style={{ width: 18, height: 18, color: 'rgba(255,255,255,0.6)', flexShrink: 0 }} />
+                <input type="date" value={block.date} onChange={e => updateDateBlock(block.id, 'date', e.target.value)}
+                  style={{ padding: '8px 12px', border: '1px solid rgba(255,255,255,0.2)', borderRadius: DS.radius, fontFamily: DS.font, fontSize: '14px', backgroundColor: 'rgba(255,255,255,0.08)', color: 'white', outline: 'none', colorScheme: 'dark' }} />
+                <span style={{ fontFamily: DS.font, fontSize: '14px', fontWeight: 600, color: 'rgba(255,255,255,0.7)', flex: 1 }}>
+                  {block.date ? new Date(block.date + 'T00:00').toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' }) : 'Изберете дата'}
+                </span>
                 {dateBlocks.length > 1 && (
-                  <button
-                    onClick={() => removeDateBlock(block.id)}
-                    style={{
-                      marginLeft: 'auto',
-                      color: '#dc2626',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '8px',
-                      borderRadius: '8px'
-                    }}
-                    title="Премахни дата"
-                  >
-                    <Trash2 style={{ width: '16px', height: '16px' }} />
+                  <button onClick={() => removeDateBlock(block.id)} style={{ color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex' }}
+                    onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,200,200,0.9)'}
+                    onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.4)'}>
+                    <Trash2 style={{ width: 16, height: 16 }} />
                   </button>
                 )}
               </div>
-            </div>
-            
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: 'linear-gradient(135deg, #195E33, #2D7A4F)' }}>
-                    <th rowSpan="2" style={{
-                      padding: '16px',
-                      color: 'white',
-                      fontWeight: 'bold',
-                      textAlign: 'center',
-                      borderRight: '1px solid rgba(255,255,255,0.2)',
-                      minWidth: '100px'
-                    }}>
-                      № на хл. камера
-                    </th>
-                    {allRefrigerators.map((refrigerator) => (
-                      <th key={refrigerator.id} colSpan="3" style={{
-                        padding: '16px',
-                        color: 'white',
-                        fontWeight: 'bold',
-                        textAlign: 'center',
-                        borderRight: '1px solid rgba(255,255,255,0.2)',
-                        minWidth: '200px'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
-                          <div style={{ flex: 1 }}>
-                            {customRefrigerators.find(ref => ref.id === refrigerator.id) ? (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <input
-                                  type="text"
-                                  value={refrigerator.name}
-                                  onChange={(e) => updateRefrigerator(refrigerator.id, 'name', e.target.value)}
-                                  style={{
-                                    backgroundColor: 'rgba(255,255,255,0.1)',
-                                    color: 'white',
-                                    padding: '8px',
-                                    borderRadius: '6px',
-                                    textAlign: 'center',
-                                    fontWeight: 'bold',
-                                    border: '1px solid rgba(255,255,255,0.2)',
-                                    width: '100%'
-                                  }}
-                                />
-                                <select
-                                  value={refrigerator.type}
-                                  onChange={(e) => {
-                                    const newType = e.target.value;
-                                    const newTemp = newType === 'negative' ? '≤ -18°C' : '0-4°C';
-                                    updateRefrigerator(refrigerator.id, 'type', newType);
-                                    updateRefrigerator(refrigerator.id, 'temp', newTemp);
-                                  }}
-                                  style={{
-                                    backgroundColor: 'rgba(255,255,255,0.1)',
-                                    color: 'white',
-                                    padding: '8px',
-                                    borderRadius: '6px',
-                                    fontWeight: 'bold',
-                                    border: '1px solid rgba(255,255,255,0.2)',
-                                    width: '100%'
-                                  }}
-                                >
-                                  <option value="positive" style={{ color: '#000' }}>Хладилна (+)</option>
-                                  <option value="negative" style={{ color: '#000' }}>Минусова (-)</option>
-                                </select>
-                              </div>
-                            ) : (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                <div>{refrigerator.name}</div>
-                                <div style={{ fontSize: '12px', opacity: 0.9 }}>
-                                  {refrigerator.type === 'negative' ? 'Минусова' : 'Хладилна'}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                          {customRefrigerators.find(ref => ref.id === refrigerator.id) && (
-                            <button
-                              onClick={() => removeRefrigerator(refrigerator.id)}
-                              style={{
-                                color: 'rgba(255,100,100,0.9)',
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              <Trash2 style={{ width: '16px', height: '16px' }} />
-                            </button>
-                          )}
-                        </div>
-                      </th>
-                    ))}
-                    <th rowSpan="2" style={{
-                      padding: '16px',
-                      color: 'white',
-                      fontWeight: 'bold',
-                      textAlign: 'center',
-                      borderRight: '1px solid rgba(255,255,255,0.2)',
-                      minWidth: '120px'
-                    }}>
-                      КД и корекции
-                    </th>
-                    <th rowSpan="2" style={{
-                      padding: '16px',
-                      color: 'white',
-                      fontWeight: 'bold',
-                      textAlign: 'center',
-                      minWidth: '120px'
-                    }}>
-                      Проверил
-                    </th>
-                  </tr>
-                  <tr style={{ background: 'linear-gradient(135deg, #195E33, #2D7A4F)' }}>
-                    {allRefrigerators.map((refrigerator) => (
-                      <th key={`${refrigerator.id}-temp`} colSpan="3" style={{
-                        padding: '12px',
-                        color: 'white',
-                        fontWeight: 'bold',
-                        textAlign: 'center',
-                        borderRight: '1px solid rgba(255,255,255,0.2)'
-                      }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                            <Thermometer style={{ width: '16px', height: '16px' }} />
-                            <span>ПОКАЗАНИЯ НА ТЕРМОМЕТЪР! °C</span>
-                          </div>
-                          <div style={{ fontSize: '13px' }}>
-                            {customRefrigerators.find(ref => ref.id === refrigerator.id) ? (
-                              <input
-                                type="text"
-                                value={refrigerator.temp}
-                                onChange={(e) => updateRefrigerator(refrigerator.id, 'temp', e.target.value)}
-                                placeholder="Температурен режим"
-                                style={{
-                                  backgroundColor: 'rgba(255,255,255,0.1)',
-                                  color: 'white',
-                                  padding: '8px',
-                                  borderRadius: '6px',
-                                  textAlign: 'center',
-                                  fontWeight: 'bold',
-                                  border: '1px solid rgba(255,255,255,0.2)',
-                                  width: '100%'
-                                }}
-                              />
-                            ) : (
-                              <span style={{
-                                padding: '4px 8px',
-                                backgroundColor: 'rgba(255,255,255,0.2)',
-                                borderRadius: '6px',
-                                fontWeight: 'bold'
-                              }}>
-                                {refrigerator.temp}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                  <tr style={{ background: 'linear-gradient(135deg, #195E33, #2D7A4F)' }}>
-                    {allRefrigerators.map((refrigerator) => (
-                      <th key={`${refrigerator.id}-desc`} colSpan="3" style={{
-                        padding: '12px',
-                        color: 'white',
-                        fontWeight: 'bold',
-                        textAlign: 'center',
-                        borderRight: '1px solid rgba(255,255,255,0.2)',
-                        fontSize: '13px'
-                      }}>
-                        {customRefrigerators.find(ref => ref.id === refrigerator.id) ? (
-                          <input
-                            type="text"
-                            value={refrigerator.description}
-                            onChange={(e) => updateRefrigerator(refrigerator.id, 'description', e.target.value)}
-                            placeholder="Описание"
-                            style={{
-                              backgroundColor: 'rgba(255,255,255,0.1)',
-                              color: 'white',
-                              padding: '8px',
-                              borderRadius: '6px',
-                              textAlign: 'center',
-                              border: '1px solid rgba(255,255,255,0.2)',
-                              width: '100%'
-                            }}
-                          />
-                        ) : (
-                          refrigerator.description
-                        )}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr style={{ backgroundColor: '#F0F7F0' }}>
-                    <td style={{
-                      padding: '12px',
-                      fontWeight: 'bold',
-                      textAlign: 'center',
-                      color: '#195E33',
-                      borderRight: '1px solid #E6F4EA'
-                    }}>
-                      Час на отчитане
-                    </td>
-                    {allRefrigerators.map((refrigerator) => (
-                      <React.Fragment key={`${refrigerator.id}-times`}>
-                        <td style={{
-                          padding: '12px',
-                          textAlign: 'center',
-                          fontWeight: 'bold',
-                          color: '#195E33',
-                          borderRight: '1px solid #E6F4EA'
-                        }}>
-                          8 h
-                        </td>
-                        <td style={{
-                          padding: '12px',
-                          textAlign: 'center',
-                          fontWeight: 'bold',
-                          color: '#195E33',
-                          borderRight: '1px solid #E6F4EA'
-                        }}>
-                          14h
-                        </td>
-                        <td style={{
-                          padding: '12px',
-                          textAlign: 'center',
-                          fontWeight: 'bold',
-                          color: '#195E33',
-                          borderRight: '1px solid #E6F4EA'
-                        }}>
-                          20h
-                        </td>
-                      </React.Fragment>
-                    ))}
-                    <td style={{ borderRight: '1px solid #E6F4EA' }}></td>
-                    <td></td>
-                  </tr>
-                  
-                  <tr>
-                    <td style={{
-                      padding: '12px',
-                      borderRight: '1px solid #E6F4EA',
-                      fontWeight: '500',
-                      color: '#195E33'
-                    }}>
-                      Температура
-                    </td>
-                    {allRefrigerators.map((refrigerator) => (
-                      <React.Fragment key={`${refrigerator.id}-${block.id}`}>
-                        {timeSlots.map((timeSlot) => {
-                          const reading = getReading(block.id, `${refrigerator.id}_${timeSlot}`);
-                          const status = getTemperatureStatus(reading, refrigerator.temp);
-                          
-                          return (
-                            <td key={`${refrigerator.id}-${timeSlot}-${block.id}`} style={{
-                              padding: '12px',
-                              borderRight: '1px solid #E6F4EA'
-                            }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <input
-                                  type="number"
-                                  step="0.1"
-                                  value={reading}
-                                  onChange={(e) => updateReading(block.id, `${refrigerator.id}_${timeSlot}`, e.target.value)}
-                                  placeholder="°C"
-                                  style={{
-                                    width: '100%',
-                                    padding: '8px',
-                                    border: status === 'warning' ? '2px solid #FB923C' : '1px solid #d1d5db',
-                                    borderRadius: '6px',
-                                    fontSize: '14px',
-                                    textAlign: 'center',
-                                    backgroundColor: status === 'warning' ? '#FFF7ED' : 'white',
-                                    color: status === 'warning' ? '#C2410C' : '#374151'
-                                  }}
-                                />
-                                {status === 'warning' && (
-                                  <AlertTriangle style={{
-                                    width: '16px',
-                                    height: '16px',
-                                    color: '#f97316'
-                                  }} title="Температурата е извън нормата" />
-                                )}
-                              </div>
-                            </td>
-                          );
-                        })}
-                      </React.Fragment>
-                    ))}
-                    <td style={{ padding: '12px', borderRight: '1px solid #E6F4EA' }}>
-                      <textarea
-                        value={getReading(block.id, 'corrective_actions')}
-                        onChange={(e) => updateReading(block.id, 'corrective_actions', e.target.value)}
-                        placeholder="Коректни действия"
-                        rows="3"
-                        style={{
-                          width: '100%',
-                          padding: '8px',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '6px',
-                          fontSize: '14px',
-                          resize: 'none'
-                        }}
-                      />
-                    </td>
-                    <td style={{ padding: '12px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <input
-                          type="text"
-                          value={getReading(block.id, 'inspector_name')}
-                          onChange={(e) => updateReading(block.id, 'inspector_name', e.target.value)}
-                          list={`inspectors-${block.id}`}
-                          placeholder="Име"
-                          style={{
-                            width: '100%',
-                            padding: '8px',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '6px',
-                            fontSize: '14px'
-                          }}
-                        />
-                        <input
-                          type="text"
-                          value={getReading(block.id, 'inspector_signature')}
-                          onChange={(e) => updateReading(block.id, 'inspector_signature', e.target.value)}
-                          placeholder="Подпис"
-                          style={{
-                            width: '100%',
-                            padding: '8px',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '6px',
-                            fontSize: '14px'
-                          }}
-                        />
-                        <datalist id={`inspectors-${block.id}`}>
-                          {savedInspectors.map((name, index) => (
-                            <option key={index} value={name} />
-                          ))}
-                        </datalist>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ))}
 
-        {/* Instructions */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-          padding: '24px',
-          marginBottom: '30px',
-          border: '1px solid #E6F4EA'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            marginBottom: '16px'
-          }}>
-            <div style={{
-              width: '12px',
-              height: '12px',
-              borderRadius: '50%',
-              backgroundColor: '#195E33'
-            }}></div>
-            <h4 style={{
-              margin: 0,
-              fontSize: '18px',
-              fontWeight: '600',
-              color: '#195E33'
-            }}>
-              Инструкции за попълване
-            </h4>
-          </div>
-          
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: '24px'
-          }}>
-            <div style={{
-              padding: '16px',
-              borderRadius: '8px',
-              backgroundColor: '#F0F7F0',
-              borderLeft: '4px solid #195E33'
-            }}>
-              <p style={{
-                margin: 0,
-                fontSize: '14px',
-                lineHeight: '1.6',
-                color: '#374151'
+              {/* Fridge cards */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(340px, 1fr))',
+                gap: isMobile ? '10px' : '14px', marginBottom: '16px',
               }}>
-                <strong style={{ color: '#195E33' }}>Честота на проверка:</strong> Температурата на хладилните камери се проверява 3 пъти дневно - в 8:00, 14:00 и 20:00 часа.
-                Записвайте точните показания на термометрите.
-              </p>
+                {refrigerators.map((fridge, i) => (
+                  <FridgeCard key={fridge.id}
+                    fridge={fridge} blockId={block.id} timeSlots={timeSlots} index={i}
+                    getReading={getReading} updateReading={updateReading} getTemperatureStatus={getTemperatureStatus}
+                    onUpdate={updateRefrigerator} onRemove={removeRefrigerator} isMobile={isMobile}
+                    isEditing={editingIds.has(fridge.id)} onToggleEdit={toggleEdit}
+                  />
+                ))}
+              </div>
+
+              {/* КД + Проверил */}
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: '14px' }}>
+                <div style={{ backgroundColor: DS.color.surface, borderRadius: DS.radius, border: `1px solid ${DS.color.borderLight}`, overflow: 'hidden', boxShadow: DS.shadow.sm }}>
+                  <div style={{ padding: '10px 16px', backgroundColor: DS.color.cardHeader, borderBottom: `1px solid ${DS.color.borderLight}`, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Edit3 style={{ width: 14, height: 14, color: DS.color.primary }} />
+                    <span style={{ fontFamily: DS.font, fontSize: '12px', fontWeight: 700, color: DS.color.primary, textTransform: 'uppercase' }}>КД и корекции</span>
+                  </div>
+                  <div style={{ padding: '14px 16px' }}>
+                    <textarea value={getReading(block.id, 'corrective_actions')} onChange={e => updateReading(block.id, 'corrective_actions', e.target.value)}
+                      placeholder="Опишете коректни действия при отклонения..." rows={3}
+                      style={{ ...inputBase(false), resize: 'vertical', lineHeight: 1.6, minHeight: '80px' }}
+                      onFocus={e => { e.target.style.borderColor = DS.color.primary; e.target.style.boxShadow = `0 0 0 3px ${DS.color.primaryGlow}`; }}
+                      onBlur={e => { e.target.style.borderColor = DS.color.borderLight; e.target.style.boxShadow = 'none'; }} />
+                  </div>
+                </div>
+                <div style={{ backgroundColor: DS.color.surface, borderRadius: DS.radius, border: `1px solid ${DS.color.borderLight}`, overflow: 'hidden', boxShadow: DS.shadow.sm }}>
+                  <div style={{ padding: '10px 16px', backgroundColor: DS.color.cardHeader, borderBottom: `1px solid ${DS.color.borderLight}`, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <User style={{ width: 14, height: 14, color: DS.color.primary }} />
+                    <span style={{ fontFamily: DS.font, fontSize: '12px', fontWeight: 700, color: DS.color.primary, textTransform: 'uppercase' }}>Проверил</span>
+                  </div>
+                  <div style={{ padding: '14px 16px' }}>
+                    <ControlInput label="Име" value={getReading(block.id, 'inspector_name')}
+                      onChange={e => updateReading(block.id, 'inspector_name', e.target.value)}
+                      placeholder="Име на проверяващ" list={`insp-${block.id}`} />
+                    <datalist id={`insp-${block.id}`}>{savedInspectors.map((n, i) => <option key={i} value={n} />)}</datalist>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div style={{
-              padding: '16px',
-              borderRadius: '8px',
-              backgroundColor: '#F0F7F0',
-              borderLeft: '4px solid #195E33'
+          ))}
+
+          {/* Submit */}
+          <div style={{ backgroundColor: DS.color.surface, borderRadius: DS.radius, padding: pad, boxShadow: DS.shadow.md, border: `1px solid ${DS.color.borderLight}`, textAlign: 'center' }}>
+            <button onClick={handleSubmit} disabled={loading} style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+              padding: isMobile ? '14px 20px' : '16px 48px', width: isMobile ? '100%' : 'auto',
+              backgroundColor: loading ? DS.color.graphiteMuted : DS.color.primary,
+              border: 'none', borderRadius: DS.radius, color: 'white', cursor: loading ? 'not-allowed' : 'pointer',
+              fontFamily: DS.font, fontSize: isMobile ? '14px' : '16px', fontWeight: 600,
+              boxShadow: loading ? 'none' : '0 4px 12px rgba(25,94,51,0.3)',
+              animation: !loading && hasAnyData() ? 'ctrlBreathe 3s ease-in-out infinite' : 'none', minHeight: '48px',
             }}>
-              <p style={{
-                margin: 0,
-                fontSize: '14px',
-                lineHeight: '1.6',
-                color: '#374151'
-              }}>
-                <strong style={{ color: '#195E33' }}>При отклонения:</strong> Ако температурата е извън допустимите граници, предприемете незабавни коректни действия 
-                и ги опишете в съответната колона. Известете отговорното лице.
-              </p>
-            </div>
-            <div style={{
-              padding: '16px',
-              borderRadius: '8px',
-              backgroundColor: '#FEF3C7',
-              borderLeft: '4px solid #F59E0B'
-            }}>
-              <p style={{
-                margin: 0,
-                fontSize: '14px',
-                lineHeight: '1.6',
-                color: '#374151'
-              }}>
-                <strong style={{ color: '#F59E0B' }}>Автоматично запазване:</strong> Вашата работа се запазва автоматично на всеки 30 секунди. 
-                Можете спокойно да излезете и да продължите по-късно.
-              </p>
-            </div>
+              <Save style={{ width: 20, height: 20 }} />
+              {loading ? 'Запазване...' : (isMobile ? 'Запази' : 'Запази контролна карта')}
+            </button>
+            <p style={{ marginTop: '8px', fontFamily: DS.font, fontSize: '12px', color: DS.color.graphiteMuted }}>
+              Конфигурацията на хладилниците се запазва автоматично
+            </p>
           </div>
         </div>
 
-        {/* Submit Button */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '12px',
-          padding: '24px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-          textAlign: 'center'
-        }}>
-          <button
-            onClick={handleSubmit}
-            disabled={loading}
-            style={{
-              padding: '16px 48px',
-              backgroundColor: loading ? '#9ca3af' : '#195E33',
-              color: 'white',
-              border: 'none',
-              borderRadius: '10px',
-              fontSize: '16px',
-              fontWeight: '600',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '12px',
-              boxShadow: '0 4px 12px rgba(25, 94, 51, 0.3)'
-            }}
-          >
-            <Save style={{ width: '20px', height: '20px' }} />
-            {loading ? 'Запазване...' : 'Запази контролна карта'}
-          </button>
+        {/* Footer */}
+        <div style={{ textAlign: 'center', padding: isMobile ? '16px 12px' : '20px 24px', color: DS.color.graphiteMuted, fontFamily: DS.font, fontSize: '11px', fontWeight: 500, borderTop: `1px solid ${DS.color.borderLight}`, marginTop: 'auto' }}>
+          © 2026 Aladin Foods | by MG
         </div>
-
       </div>
-    </div>
+    </>
   );
 };
 

@@ -1,663 +1,916 @@
 // src/components/templates/IncomingMaterialsControl.jsx
-import React, { useState, useEffect } from 'react';
-import { Save, Download, Plus, Trash2, Package, Calendar, Building2, Thermometer, CheckSquare, Square } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
-const IncomingMaterialsControl = ({ template, department, restaurantId, onBack }) => {
-  const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
-  const [companyName, setCompanyName] = useState();
-  const [objectName, setObjectName] = useState();
-  const [manager, setManager] = useState('');
-  const [loading, setLoading] = useState(false);
-  
-  const [savedMaterialNames, setSavedMaterialNames] = useState([]);
-  const [savedResponsibles, setSavedResponsibles] = useState([]);
-  
-  const [materials, setMaterials] = useState([
-    {
-      id: 1,
-      receiptDate: '',
-      materialName: '',
-      batchNumber: '',
-      supplier: '',
-      quantity: '',
-      document: '',
-      useByDate: '',
-      transportType: '',
-      vehicleCleaned: '',
-      temperature: '',
-      packagingDefects: '',
-      accepted: false,
-      responsibleSignature: ''
-    }
-  ]);
+/* ═══════════════════════════════════════════════════════════════
+   DESIGN SYSTEM
+   ═══════════════════════════════════════════════════════════════ */
+const DS = {
+  color: {
+    bg: '#ECEEED', bgWarm: '#F4F6F5', surface: '#FFFFFF', surfaceAlt: '#F7F9F8',
+    primary: '#1B5E37', primaryLight: '#2D7A4F', primaryGlow: 'rgba(27,94,55,0.08)',
+    cardHeader: '#E8F5EE',
+    graphite: '#1E2A26', graphiteMed: '#3D4F48', graphiteLight: '#6B7D76', graphiteMuted: '#95A39D',
+    sage: '#A8BFB2', sageMuted: '#C5D5CB', sageLight: '#DDE8E1',
+    ok: '#1B8A50', okBg: '#E8F5EE', okLight: '#D1FAE5',
+    warning: '#C47F17', warningBg: '#FEF3C7',
+    danger: '#C53030', dangerBg: '#FEE2E2',
+    pending: '#6B7D76', pendingBg: '#F0F2F1',
+    border: '#D5DDD9', borderLight: '#E4EBE7',
+    blue: '#2563EB', blueBg: '#EFF6FF',
+  },
+  font: "'DM Sans', system-ui, sans-serif",
+  radius: '0px',
+  shadow: {
+    sm: '0 1px 3px rgba(30,42,38,0.06),0 1px 2px rgba(30,42,38,0.04)',
+    md: '0 4px 12px rgba(30,42,38,0.06),0 1px 4px rgba(30,42,38,0.04)',
+    glow: '0 0 20px rgba(27,94,55,0.15),0 4px 12px rgba(30,42,38,0.06)',
+  },
+};
 
-  const addMaterial = () => {
-    const newMaterial = {
-      id: Date.now(),
-      receiptDate: '',
-      materialName: '',
-      batchNumber: '',
-      supplier: '',
-      quantity: '',
-      document: '',
-      useByDate: '',
-      transportType: '',
-      vehicleCleaned: '',
-      temperature: '',
-      packagingDefects: '',
-      accepted: false,
-      responsibleSignature: ''
-    };
-    setMaterials([...materials, newMaterial]);
+const LOGO_URL = 'https://aladinfoods.bg/assets/images/aladinfoods_logo.png';
+
+const GLOBAL_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+  *, *::before, *::after { box-sizing: border-box; }
+  @keyframes ctrlFadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes ctrlBreathe { 0%,100%{box-shadow:${DS.shadow.glow}} 50%{box-shadow:0 0 24px rgba(27,94,55,0.25),0 4px 16px rgba(30,42,38,0.08)} }
+  @keyframes slideUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes chipPop { 0%{transform:scale(0.95)} 50%{transform:scale(1.03)} 100%{transform:scale(1)} }
+  body { margin:0; background:${DS.color.bg}; }
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+  input[type=number] { -moz-appearance:textfield; }
+  @media (max-width:767px) { input,button,select,textarea { font-size:16px !important; } }
+`;
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE HOOK
+   ═══════════════════════════════════════════════════════════════ */
+const useResponsive = () => {
+  const [s, setS] = useState({ isMobile: window.innerWidth < 768 });
+  useEffect(() => {
+    const f = () => setS({ isMobile: window.innerWidth < 768 });
+    window.addEventListener('resize', f);
+    window.addEventListener('orientationchange', () => setTimeout(f, 100));
+    return () => window.removeEventListener('resize', f);
+  }, []);
+  return s;
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   INLINE SVG ICONS
+   ═══════════════════════════════════════════════════════════════ */
+const Icon = ({ name, size = 16, color = 'currentColor', style: st }) => {
+  const p = {
+    back: <><polyline points="15 18 9 12 15 6" /></>,
+    plus: <><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>,
+    trash: <><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></>,
+    check: <><polyline points="20 6 9 17 4 12" /></>,
+    x: <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>,
+    save: <><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></>,
+    edit: <><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></>,
+    package: <><line x1="16.5" y1="9.4" x2="7.5" y2="4.21" /><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></>,
+    truck: <><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></>,
+    thermometer: <><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" /></>,
+    clipboard: <><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" ry="1" /></>,
+    alert: <><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></>,
+    zap: <><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></>,
+    users: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>,
+    calendar: <><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></>,
+    rotateCcw: <><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></>,
+    download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></>,
   };
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={st}>
+      {p[name]}
+    </svg>
+  );
+};
 
-  const removeMaterial = (id) => {
-    if (materials.length > 1) {
-      setMaterials(materials.filter(material => material.id !== id));
+/* ═══════════════════════════════════════════════════════════════
+   SHARED UI COMPONENTS
+   ═══════════════════════════════════════════════════════════════ */
+const inputBase = (focused) => ({
+  width: '100%', padding: '10px 12px',
+  backgroundColor: focused ? DS.color.surface : DS.color.surfaceAlt,
+  border: `1.5px solid ${focused ? DS.color.primary : DS.color.borderLight}`,
+  borderRadius: DS.radius, fontSize: '14px', fontFamily: DS.font, fontWeight: 500,
+  color: DS.color.graphite, outline: 'none', transition: 'all 150ms ease',
+  boxShadow: focused ? `0 0 0 3px ${DS.color.primaryGlow}` : 'none',
+  boxSizing: 'border-box', WebkitAppearance: 'none',
+});
+
+const ControlInput = ({ label, type = 'text', value, onChange, placeholder, style: s, disabled, ...rest }) => {
+  const [focused, setFocused] = useState(false);
+  return (
+    <div style={{ minWidth: 0, flex: 1, ...s }}>
+      {label && (
+        <label style={{
+          display: 'block', fontFamily: DS.font, fontSize: '11px', fontWeight: 600,
+          color: focused ? DS.color.primary : DS.color.graphiteLight,
+          textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px',
+          transition: 'color 150ms',
+        }}>{label}</label>
+      )}
+      <input type={type} value={value} onChange={onChange} placeholder={placeholder}
+        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+        disabled={disabled}
+        style={{ ...inputBase(focused), opacity: disabled ? 0.6 : 1, cursor: disabled ? 'not-allowed' : 'text' }}
+        {...rest} />
+    </div>
+  );
+};
+
+const ControlSelect = ({ label, value, onChange, children, style: s, highlighted }) => {
+  const [focused, setFocused] = useState(false);
+  return (
+    <div style={{ minWidth: 0, flex: 1, ...s }}>
+      {label && (
+        <label style={{
+          display: 'block', fontFamily: DS.font, fontSize: '11px', fontWeight: 600,
+          color: focused ? DS.color.primary : DS.color.graphiteLight,
+          textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px',
+        }}>{label}</label>
+      )}
+      <select value={value} onChange={onChange}
+        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+        style={{
+          ...inputBase(focused), cursor: 'pointer',
+          backgroundColor: highlighted ? DS.color.okBg : (focused ? DS.color.surface : DS.color.surfaceAlt),
+          borderColor: highlighted ? DS.color.ok : (focused ? DS.color.primary : DS.color.borderLight),
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2395A39D' stroke-width='1.5' fill='none'/%3E%3C/svg%3E")`,
+          backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center', paddingRight: '28px',
+          MozAppearance: 'none', appearance: 'none',
+        }}>
+        {children}
+      </select>
+    </div>
+  );
+};
+
+const SectionHeader = ({ icon, title, right }) => (
+  <div style={{
+    backgroundColor: DS.color.cardHeader, padding: '12px 16px',
+    display: 'flex', alignItems: 'center', gap: '8px',
+  }}>
+    <Icon name={icon} size={16} color={DS.color.primary} />
+    <span style={{ fontFamily: DS.font, fontSize: '13px', fontWeight: 700, color: DS.color.primary, textTransform: 'uppercase', letterSpacing: '0.04em', flex: 1 }}>
+      {title}
+    </span>
+    {right}
+  </div>
+);
+
+const AutoBadge = () => (
+  <span style={{
+    display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '2px 7px',
+    backgroundColor: DS.color.okBg, color: DS.color.ok, borderRadius: '8px',
+    fontFamily: DS.font, fontSize: '10px', fontWeight: 700, marginLeft: '6px',
+  }}>
+    <Icon name="zap" size={9} color={DS.color.ok} /> Авто
+  </span>
+);
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+   ═══════════════════════════════════════════════════════════════ */
+const IncomingMaterialsControl = ({ profile: propProfile, user: propUser, onBack }) => {
+  const { isMobile } = useResponsive();
+  const [now, setNow] = useState(new Date());
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  // Auth
+  let authContext = null;
+  try { authContext = useAuth(); } catch {}
+  const user = authContext?.user || propUser;
+  const profile = authContext?.profile || propProfile;
+  const authLoading = authContext?.loading || false;
+
+  // State
+  const [localLoading, setLocalLoading] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState('');
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [editingBasicInfo, setEditingBasicInfo] = useState(false);
+
+  // Basic Info
+  const [basicInfo, setBasicInfo] = useState({
+    companyName: 'Аладин Фуудс ООД',
+    objectName: profile?.restaurants?.name || '',
+    controlDate: new Date().toISOString().split('T')[0],
+    managerName: user?.email || '',
+  });
+
+  // Suppliers
+  const [suppliers, setSuppliers] = useState([]);
+  const [selectedSupplier, setSelectedSupplier] = useState(null);
+  const [supplierMaterials, setSupplierMaterials] = useState([]);
+
+  // Current Material Form
+  const [currentMaterial, setCurrentMaterial] = useState({
+    materialName: '', temperature: '', transportType: '',
+    quantity: '', batchNumber: '',
+    receiptDate: new Date().toISOString().split('T')[0],
+    expiryDate: '', notes: '',
+  });
+  const [autoFilled, setAutoFilled] = useState({ materialName: false, temperature: false, transportType: false });
+
+  // Materials List
+  const [materials, setMaterials] = useState([]);
+
+  // New Supplier Modal
+  const [showNewSupplierModal, setShowNewSupplierModal] = useState(false);
+  const [newSupplier, setNewSupplier] = useState({ name: '', contactInfo: '', materials: [] });
+
+  // ─── Offline sync ───
+  const PENDING_KEY = 'pending_incoming_control';
+  const DRAFT_KEY = `draft_incoming_${profile?.restaurants?.id || 'x'}`;
+
+  const getPending = () => { try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); } catch { return []; } };
+  const savePendingQ = (q) => localStorage.setItem(PENDING_KEY, JSON.stringify(q));
+  const pendingCount = getPending().length;
+
+  const flushPending = useCallback(async () => {
+    const queue = getPending(); if (!queue.length) return;
+    const remaining = [];
+    for (const item of queue) {
+      try {
+        const { _savedAt, ...payload } = item;
+        // Insert control record
+        const { data: rec, error: e1 } = await supabase.from('incoming_control_records').insert({
+          restaurant_id: payload.restaurant_id, control_date: payload.control_date,
+          company_name: payload.company_name, object_name: payload.object_name,
+          manager_name: payload.manager_name, status: 'finalized',
+          finalized_at: payload.finalized_at, finalized_by: payload.finalized_by, created_by: payload.created_by,
+        }).select().single();
+        if (e1) throw e1;
+        // Insert materials
+        const mats = payload.materials.map(m => ({ ...m, control_record_id: rec.id }));
+        const { error: e2 } = await supabase.from('incoming_control_materials').insert(mats);
+        if (e2) throw e2;
+      } catch { remaining.push(item); }
     }
-  };
-
-  const updateMaterial = (id, field, value) => {
-    setMaterials(materials.map(material => 
-      material.id === id ? { ...material, [field]: value } : material
-    ));
-    
-    if (field === 'materialName' && value.trim() && !savedMaterialNames.includes(value.trim())) {
-      setSavedMaterialNames([...savedMaterialNames, value.trim()]);
+    savePendingQ(remaining);
+    if (!remaining.length) {
+      setAutoSaveStatus(`✓ ${queue.length} записа синхронизирани`);
+    } else {
+      setAutoSaveStatus(`⚠ ${remaining.length} записа не са синхронизирани`);
     }
-    
-    if (field === 'responsibleSignature' && value.trim() && !savedResponsibles.includes(value.trim())) {
-      setSavedResponsibles([...savedResponsibles, value.trim()]);
-    }
-  };
+    setTimeout(() => setAutoSaveStatus(''), 4000);
+  }, []);
 
-  const exportData = () => {
-    const data = {
-      date: currentDate,
-      companyName,
-      objectName,
-      manager,
-      materials,
-      savedMaterialNames,
-      savedResponsibles,
-      exportTime: new Date().toLocaleString('bg-BG')
-    };
-    
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `incoming_materials_control_${currentDate}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  // ─── Clock + Online ───
+  useEffect(() => { const t = setInterval(() => setNow(new Date()), 30000); return () => clearInterval(t); }, []);
+  useEffect(() => {
+    const on = () => { setIsOnline(true); flushPending(); };
+    const off = () => setIsOnline(false);
+    window.addEventListener('online', on); window.addEventListener('offline', off);
+    if (navigator.onLine && getPending().length) flushPending();
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, [flushPending]);
 
-  const saveToSupabase = async () => {
-    setLoading(true);
-    try {
-      const { data: userData } = await supabase.auth.getUser();
-      
-      const submissionData = {
-        template_id: template.id,
-        restaurant_id: restaurantId,
-        department_id: department.id,
-        data: {
-          currentDate,
-          companyName,
-          objectName,
-          manager,
-          materials,
-          savedMaterialNames,
-          savedResponsibles
-        },
-        submitted_by: userData.user.id,
-        submission_date: currentDate,
-        synced: true
-      };
-
-      const { error } = await supabase
-        .from('checklist_submissions')
-        .insert(submissionData);
-
-      if (error) throw error;
-
-      alert('Данните са запазени успешно!');
-      onBack();
-    } catch (error) {
-      console.error('Submit error:', error);
-      alert('Грешка при запазване: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // ─── Draft ───
+  const saveDraft = useCallback(() => {
+    if (materials.length === 0) return;
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ basicInfo, materials, timestamp: Date.now() }));
+    setAutoSaveStatus('✓ Автозапис');
+    setTimeout(() => setAutoSaveStatus(''), 2000);
+  }, [materials, basicInfo, DRAFT_KEY]);
 
   useEffect(() => {
-    // Load last submission for this template to get saved names
-    const loadLastSubmission = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('checklist_submissions')
-          .select('data')
-          .eq('template_id', template.id)
-          .eq('restaurant_id', restaurantId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-
-        if (data && !error) {
-          if (data.data.savedMaterialNames) {
-            setSavedMaterialNames(data.data.savedMaterialNames);
-          }
-          if (data.data.savedResponsibles) {
-            setSavedResponsibles(data.data.savedResponsibles);
-          }
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved) {
+        const { basicInfo: bi, materials: m, timestamp } = JSON.parse(saved);
+        if (m?.length) {
+          setBasicInfo(prev => ({ ...prev, ...bi }));
+          setMaterials(m);
+          setAutoSaveStatus(`Зареден драфт от ${new Date(timestamp).toLocaleString('bg-BG')}`);
+          setTimeout(() => setAutoSaveStatus(''), 4000);
         }
-      } catch (error) {
-        console.log('No previous data found');
       }
+    } catch {}
+  }, [DRAFT_KEY]);
+
+  useEffect(() => { const t = setInterval(saveDraft, 30000); return () => clearInterval(t); }, [saveDraft]);
+
+  // ─── Load suppliers ───
+  useEffect(() => { if (profile?.restaurants?.id) loadSuppliers(); }, [profile]);
+
+  const loadSuppliers = async () => {
+    try {
+      const { data, error } = await supabase.from('incoming_control_suppliers')
+        .select('*, incoming_control_supplier_materials(id,material_name,typical_temp,typical_transport,frequency,last_used_at)')
+        .eq('is_active', true).order('name');
+      if (error) throw error;
+      setSuppliers(data || []);
+      return data || [];
+    } catch (e) { console.error('Error loading suppliers:', e); return []; }
+  };
+
+  // ─── Supplier selection ───
+  const handleSupplierChange = (supplierId, supplierList) => {
+    if (supplierId === 'new') { setShowNewSupplierModal(true); return; }
+    if (!supplierId) { setSelectedSupplier(null); setSupplierMaterials([]); return; }
+    // Allow passing fresh supplier list (for use right after loadSuppliers)
+    const list = supplierList || suppliers;
+    const sup = list.find(s => s.id === supplierId);
+    if (!sup) { console.warn('Supplier not found:', supplierId); return; }
+    setSelectedSupplier(sup);
+    setSupplierMaterials((sup?.incoming_control_supplier_materials || []).sort((a, b) => (b.frequency || 0) - (a.frequency || 0)));
+  };
+
+  // ─── Auto-fill ───
+  const handleAutoFill = (mat) => {
+    setCurrentMaterial(prev => ({
+      ...prev, materialName: mat.material_name,
+      temperature: mat.typical_temp || '', transportType: mat.typical_transport || '',
+    }));
+    setAutoFilled({ materialName: true, temperature: true, transportType: true });
+  };
+
+  // ─── Add / Remove material ───
+  const handleAddMaterial = () => {
+    if (!currentMaterial.materialName || !currentMaterial.quantity || !currentMaterial.batchNumber) {
+      alert('Моля попълни материал, количество и партиден номер!'); return;
+    }
+    if (!selectedSupplier) { alert('Моля избери доставчик!'); return; }
+
+    setMaterials(prev => [...prev, {
+      ...currentMaterial, supplierId: selectedSupplier.id,
+      supplierName: selectedSupplier.name, id: Date.now(),
+    }]);
+    resetMaterialForm();
+  };
+
+  const resetMaterialForm = () => {
+    setCurrentMaterial({
+      materialName: '', temperature: '', transportType: '',
+      quantity: '', batchNumber: '',
+      receiptDate: new Date().toISOString().split('T')[0],
+      expiryDate: '', notes: '',
+    });
+    setAutoFilled({ materialName: false, temperature: false, transportType: false });
+    setSelectedSupplier(null); setSupplierMaterials([]);
+  };
+
+  const handleDeleteMaterial = (idx) => {
+    if (window.confirm('Изтриване на този материал?')) {
+      setMaterials(prev => prev.filter((_, i) => i !== idx));
+    }
+  };
+
+  // ─── New Supplier modal ───
+  const handleSaveNewSupplier = async () => {
+    if (!newSupplier.name.trim()) { alert('Моля въведи име на доставчик!'); return; }
+    if (!profile?.restaurants?.id) { alert('Грешка: Не е намерен ресторант.'); return; }
+    try {
+      setLocalLoading(true);
+      const { data: sup, error: e1 } = await supabase.from('incoming_control_suppliers')
+        .insert({ restaurant_id: profile.restaurants.id, name: newSupplier.name, contact_info: newSupplier.contactInfo, created_by: user.id })
+        .select().single();
+      if (e1) throw e1;
+      if (newSupplier.materials.length > 0) {
+        const toInsert = newSupplier.materials.filter(m => m.name.trim()).map(m => ({
+          supplier_id: sup.id, material_name: m.name, typical_temp: m.temp || null, typical_transport: m.transport || null,
+        }));
+        if (toInsert.length) {
+          const { error: e2 } = await supabase.from('incoming_control_supplier_materials').insert(toInsert);
+          if (e2) throw e2;
+        }
+      }
+      const freshList = await loadSuppliers();
+      setShowNewSupplierModal(false);
+      const savedName = newSupplier.name;
+      setNewSupplier({ name: '', contactInfo: '', materials: [] });
+      // Use fresh list to find and select the new supplier
+      handleSupplierChange(sup.id, freshList);
+      setAutoSaveStatus(`✓ Доставчик "${savedName}" създаден`);
+      setTimeout(() => setAutoSaveStatus(''), 3000);
+    } catch (e) {
+      console.error(e); alert('Грешка: ' + e.message);
+    } finally { setLocalLoading(false); }
+  };
+
+  const addSupplierMatRow = () => setNewSupplier(p => ({ ...p, materials: [...p.materials, { name: '', temp: '', transport: '' }] }));
+  const removeSupplierMatRow = (i) => setNewSupplier(p => ({ ...p, materials: p.materials.filter((_, j) => j !== i) }));
+  const updateSupplierMat = (i, f, v) => setNewSupplier(p => ({ ...p, materials: p.materials.map((m, j) => j === i ? { ...m, [f]: v } : m) }));
+
+  // ─── Finalize ───
+  const handleFinalize = async () => {
+    if (materials.length === 0) { alert('Моля добави поне един материал!'); return; }
+    setLocalLoading(true);
+
+    const materialsPayload = materials.map(m => ({
+      supplier_id: m.supplierId, supplier_name: m.supplierName,
+      material_name: m.materialName, quantity: m.quantity,
+      batch_number: m.batchNumber, temperature: m.temperature || null,
+      transport_type: m.transportType || null,
+      receipt_date: m.receiptDate || null, expiry_date: m.expiryDate || null,
+      status: 'accepted', notes: m.notes || null, created_by: user?.id,
+    }));
+
+    const recordPayload = {
+      restaurant_id: profile?.restaurants?.id,
+      control_date: basicInfo.controlDate,
+      company_name: basicInfo.companyName,
+      object_name: basicInfo.objectName,
+      manager_name: basicInfo.managerName,
+      finalized_at: new Date().toISOString(),
+      finalized_by: user?.id, created_by: user?.id,
+      materials: materialsPayload,
     };
 
-    loadLastSubmission();
-  }, [template.id, restaurantId]);
+    if (!navigator.onLine) {
+      const q = getPending(); q.push({ ...recordPayload, _savedAt: Date.now() }); savePendingQ(q);
+      localStorage.removeItem(DRAFT_KEY);
+      setMaterials([]); resetMaterialForm();
+      setAutoSaveStatus('📱 Запазено офлайн');
+      setTimeout(() => setAutoSaveStatus(''), 4000);
+      setLocalLoading(false); return;
+    }
+
+    try {
+      const { data: rec, error: e1 } = await supabase.from('incoming_control_records').insert({
+        restaurant_id: profile.restaurants.id, control_date: basicInfo.controlDate,
+        company_name: basicInfo.companyName, object_name: basicInfo.objectName,
+        manager_name: basicInfo.managerName, status: 'finalized',
+        finalized_at: new Date().toISOString(), finalized_by: user.id, created_by: user.id,
+      }).select().single();
+      if (e1) throw e1;
+
+      const matsInsert = materialsPayload.map(m => ({ ...m, control_record_id: rec.id }));
+      const { error: e2 } = await supabase.from('incoming_control_materials').insert(matsInsert);
+      if (e2) throw e2;
+
+      localStorage.removeItem(DRAFT_KEY);
+      setMaterials([]); resetMaterialForm();
+      setAutoSaveStatus('✓ Входящ контрол финализиран!');
+      setTimeout(() => setAutoSaveStatus(''), 4000);
+      if (getPending().length) flushPending();
+    } catch (e) {
+      console.error(e);
+      const q = getPending(); q.push({ ...recordPayload, _savedAt: Date.now() }); savePendingQ(q);
+      setAutoSaveStatus('⚠ Грешка — запазено офлайн');
+      setTimeout(() => setAutoSaveStatus(''), 4000);
+      setMaterials([]); resetMaterialForm();
+    } finally { setLocalLoading(false); }
+  };
+
+  // ─── Back ───
+  const handleBack = () => {
+    if (materials.length > 0) setShowExitConfirm(true);
+    else onBack?.();
+  };
+  const confirmExit = (save) => {
+    if (save) { saveDraft(); setTimeout(() => onBack?.(), 800); }
+    else { onBack?.(); }
+    setShowExitConfirm(false);
+  };
+
+  const hasAnyData = materials.length > 0;
+
+  // ─── Loading gate ───
+  if (authLoading || !profile?.restaurants) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: DS.font, fontSize: '16px', color: DS.color.graphiteMuted }}>
+        Зареждане на ресторант...
+      </div>
+    );
+  }
 
   return (
-    <div style={{minHeight: '100vh', backgroundColor: '#F4F6F8'}}>
-      <div style={{maxWidth: '1600px', margin: '0 auto', padding: '24px'}}>
-        
-        {/* Back button */}
-        <button
-          onClick={onBack}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#6b7280',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            marginBottom: '20px',
-            fontWeight: '600'
-          }}
-        >
-          ← Назад
-        </button>
+    <div style={{ minHeight: '100vh', backgroundColor: DS.color.bg, fontFamily: DS.font }}>
+      <style>{GLOBAL_CSS}</style>
 
-        <div 
-          style={{
-            borderRadius: '12px',
-            marginBottom: '32px',
-            padding: '32px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-            background: 'linear-gradient(135deg, #195E33, #2D7A4F)',
-            border: '1px solid #E6F4EA'
-          }}
-        >
-          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'start'}}>
-            <div style={{flex: 1}}>
-              <input
-                type="text"
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-                style={{
-                  fontSize: '24px',
-                  fontWeight: 'bold',
-                  marginBottom: '16px',
-                  width: '100%',
-                  padding: '12px',
-                  backgroundColor: 'white',
-                  borderRadius: '8px',
-                  border: 'none',
-                  color: '#195E33'
-                }}
-                placeholder="Име на фирмата"
-              />
-              <input
-                type="text"
-                value={objectName}
-                onChange={(e) => setObjectName(e.target.value)}
-                style={{
-                  fontSize: '18px',
-                  marginBottom: '16px',
-                  width: '100%',
-                  padding: '12px',
-                  backgroundColor: 'white',
-                  borderRadius: '8px',
-                  border: 'none',
-                  color: '#195E33'
-                }}
-                placeholder="Име на обекта"
-              />
-              <h2 style={{fontSize: '20px', fontWeight: 'bold', color: 'white', margin: 0}}>
-                ДНЕВНИК ЗА ВХОДЯЩ КОНТРОЛ НА ОСНОВНИ СУРОВИНИ
-              </h2>
+      {/* ═══ DARK TOP BAR ═══ */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 100,
+        backgroundColor: DS.color.graphite, padding: '0 16px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        height: '48px', boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button onClick={handleBack} style={{
+            display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px',
+            backgroundColor: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: DS.radius, color: 'white', fontSize: '12px', fontFamily: DS.font,
+            fontWeight: 600, cursor: 'pointer',
+          }}>
+            <Icon name="back" size={14} color="white" /> {!isMobile && 'Назад'}
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: isOnline ? '#4ADE80' : '#F87171' }} />
+            {!isMobile && <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '10px', fontWeight: 600 }}>{isOnline ? 'Online' : 'Offline'}</span>}
+          </div>
+          {pendingCount > 0 && (
+            <div style={{ backgroundColor: DS.color.warning, color: 'white', padding: '2px 8px', borderRadius: '10px', fontSize: '10px', fontWeight: 700 }}>{pendingCount} чакащи</div>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {autoSaveStatus && <span style={{ color: '#4ADE80', fontSize: '11px', fontWeight: 600 }}>{autoSaveStatus}</span>}
+          {materials.length > 0 && (
+            <div style={{ backgroundColor: DS.color.primary, color: 'white', padding: '2px 8px', borderRadius: '10px', fontSize: '10px', fontWeight: 700 }}>
+              {materials.length} мат.
             </div>
-            <div style={{textAlign: 'right', color: 'white', marginLeft: '32px'}}>
-              <div style={{backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '8px', padding: '16px'}}>
-                <p style={{fontWeight: 'bold', fontSize: '18px', margin: '0 0 8px 0'}}>КОД: ПРП 6.0.1</p>
-                <p style={{opacity: 0.9, margin: '0 0 8px 0'}}>РЕДАКЦИЯ: 00</p>
-                <p style={{fontWeight: '600', margin: 0}}>СТР. 1 ОТ 1</p>
-              </div>
+          )}
+          <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 600 }}>
+            {now.toLocaleString('bg-BG', { hour: '2-digit', minute: '2-digit', ...(isMobile ? {} : { day: '2-digit', month: '2-digit' }), hour12: false })}
+          </span>
+        </div>
+      </div>
+
+      {/* ═══ LOGO + TITLE ═══ */}
+      <div style={{ padding: '16px 16px 0', maxWidth: '800px', margin: '0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+          <img src={LOGO_URL} alt="Aladin" style={{ height: '36px', objectFit: 'contain' }} onError={e => { e.target.style.display = 'none'; }} />
+          <div>
+            <h1 style={{ margin: 0, fontFamily: DS.font, fontSize: '18px', fontWeight: 700, color: DS.color.graphite }}>
+              Входящ контрол на суровини
+            </h1>
+            <p style={{ margin: 0, fontFamily: DS.font, fontSize: '12px', color: DS.color.graphiteMuted }}>
+              Код: FS-IC-01 • Ревизия 01
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ padding: '0 16px 120px', maxWidth: '800px', margin: '0 auto' }}>
+
+        {/* ═══ BASIC INFO ═══ */}
+        <div style={{
+          backgroundColor: DS.color.surface, borderRadius: DS.radius, boxShadow: DS.shadow.sm,
+          overflow: 'hidden', marginBottom: '16px', animation: 'ctrlFadeIn 0.3s ease',
+          border: `1px solid ${DS.color.borderLight}`,
+        }}>
+          <SectionHeader icon="clipboard" title="Основна информация" right={
+            <button onClick={() => setEditingBasicInfo(!editingBasicInfo)} style={{
+              padding: '4px 10px', border: `1px solid ${editingBasicInfo ? DS.color.ok : DS.color.borderLight}`,
+              borderRadius: DS.radius, backgroundColor: editingBasicInfo ? DS.color.okBg : 'transparent',
+              color: editingBasicInfo ? DS.color.ok : DS.color.graphiteMuted,
+              fontFamily: DS.font, fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+            }}>
+              <Icon name="edit" size={11} color={editingBasicInfo ? DS.color.ok : DS.color.graphiteMuted} style={{ marginRight: '4px', verticalAlign: '-2px' }} />
+              {editingBasicInfo ? 'Готово' : 'Редакция'}
+            </button>
+          } />
+          <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <ControlInput label="Фирма" value={basicInfo.companyName} disabled={!editingBasicInfo}
+              onChange={e => setBasicInfo(p => ({ ...p, companyName: e.target.value }))} />
+            <div style={{ display: 'flex', gap: '12px', flexDirection: isMobile ? 'column' : 'row' }}>
+              <ControlInput label="Обект" value={basicInfo.objectName} disabled={!editingBasicInfo}
+                onChange={e => setBasicInfo(p => ({ ...p, objectName: e.target.value }))} />
+              <ControlInput label="Дата" type="date" value={basicInfo.controlDate} disabled={!editingBasicInfo}
+                onChange={e => setBasicInfo(p => ({ ...p, controlDate: e.target.value }))} />
             </div>
+            <ControlInput label="Управител" value={basicInfo.managerName} disabled={!editingBasicInfo}
+              onChange={e => setBasicInfo(p => ({ ...p, managerName: e.target.value }))} placeholder="Име и фамилия" />
           </div>
         </div>
 
-        <div style={{backgroundColor: 'white', borderRadius: '12px', padding: '24px', marginBottom: '32px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb'}}>
-          <div style={{display: 'flex', flexWrap: 'wrap', gap: '24px', alignItems: 'center'}}>
-            <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
-              <div style={{padding: '8px', borderRadius: '8px', backgroundColor: '#E6F4EA'}}>
-                <Calendar style={{height: '20px', width: '20px', color: '#195E33'}} />
-              </div>
-              <div>
-                <label style={{display: 'block', fontSize: '14px', fontWeight: '500', color: '#6b7280', marginBottom: '4px'}}>Дата:</label>
-                <input
-                  type="date"
-                  value={currentDate}
-                  onChange={(e) => setCurrentDate(e.target.value)}
-                  style={{
-                    padding: '8px 12px',
-                    border: '1px solid #E6F4EA',
-                    borderRadius: '8px',
-                    fontSize: '14px'
-                  }}
-                />
-              </div>
-            </div>
+        {/* ═══ ADD MATERIAL ═══ */}
+        <div style={{
+          backgroundColor: DS.color.surface, borderRadius: DS.radius, boxShadow: DS.shadow.md,
+          overflow: 'hidden', marginBottom: '16px', animation: 'ctrlFadeIn 0.4s ease',
+          border: `1px solid ${DS.color.borderLight}`,
+        }}>
+          <SectionHeader icon="plus" title="Добави материал" />
 
-            <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
-              <div style={{padding: '8px', borderRadius: '8px', backgroundColor: '#E6F4EA'}}>
-                <Building2 style={{height: '20px', width: '20px', color: '#195E33'}} />
-              </div>
-              <div>
-                <label style={{display: 'block', fontSize: '14px', fontWeight: '500', color: '#6b7280', marginBottom: '4px'}}>Управител:</label>
-                <input
-                  type="text"
-                  value={manager}
-                  onChange={(e) => setManager(e.target.value)}
-                  style={{
-                    padding: '8px 12px',
-                    border: '1px solid #E6F4EA',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    minWidth: '200px'
-                  }}
-                  placeholder="Име и фамилия"
-                />
-              </div>
-            </div>
+          <div style={{ padding: '16px' }}>
+            {/* 1. Supplier select */}
+            <ControlSelect label="1. Доставчик" value={selectedSupplier?.id || ''}
+              onChange={e => handleSupplierChange(e.target.value)}>
+              <option value="">— Избери доставчик —</option>
+              {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              <option value="new">+ Добави нов доставчик</option>
+            </ControlSelect>
 
-            <div style={{display: 'flex', gap: '12px', marginLeft: 'auto'}}>
-              <button
-                onClick={addMaterial}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '10px 16px',
-                  borderRadius: '8px',
-                  fontWeight: '500',
-                  backgroundColor: 'white',
-                  color: '#195E33',
-                  border: '1px solid #195E33',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                <Package style={{height: '16px', width: '16px'}} />
-                Добави суровина
-              </button>
-              <button
-                onClick={saveToSupabase}
-                disabled={loading}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '10px 16px',
-                  borderRadius: '8px',
-                  fontWeight: '500',
-                  backgroundColor: loading ? '#9ca3af' : '#195E33',
-                  color: 'white',
-                  border: 'none',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                <Save style={{height: '16px', width: '16px'}} />
-                {loading ? 'Запазване...' : 'Запази'}
-              </button>
-              <button
-                onClick={exportData}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '10px 16px',
-                  borderRadius: '8px',
-                  fontWeight: '500',
-                  backgroundColor: '#195E33',
-                  color: 'white',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                <Download style={{height: '16px', width: '16px'}} />
-                Експорт
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div style={{backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb', overflow: 'hidden'}}>
-          <div style={{overflowX: 'auto'}}>
-            <table style={{width: '100%', borderCollapse: 'collapse'}}>
-              <thead style={{backgroundColor: '#195E33'}}>
-                <tr>
-                  <th style={{padding: '16px', color: 'white', fontWeight: '600', fontSize: '13px', textAlign: 'center', minWidth: '120px', borderRight: '1px solid rgba(255,255,255,0.2)'}}>
-                    Дата на приемане
-                  </th>
-                  <th style={{padding: '16px', color: 'white', fontWeight: '600', fontSize: '13px', textAlign: 'center', minWidth: '150px', borderRight: '1px solid rgba(255,255,255,0.2)'}}>
-                    Наименование на суровината
-                  </th>
-                  <th style={{padding: '16px', color: 'white', fontWeight: '600', fontSize: '13px', textAlign: 'center', minWidth: '120px', borderRight: '1px solid rgba(255,255,255,0.2)'}}>
-                    Номер на партида
-                  </th>
-                  <th style={{padding: '16px', color: 'white', fontWeight: '600', fontSize: '13px', textAlign: 'center', minWidth: '130px', borderRight: '1px solid rgba(255,255,255,0.2)'}}>
-                    Доставчик (производител)
-                  </th>
-                  <th style={{padding: '16px', color: 'white', fontWeight: '600', fontSize: '13px', textAlign: 'center', minWidth: '100px', borderRight: '1px solid rgba(255,255,255,0.2)'}}>
-                    Количество
-                  </th>
-                  <th style={{padding: '16px', color: 'white', fontWeight: '600', fontSize: '13px', textAlign: 'center', minWidth: '130px', borderRight: '1px solid rgba(255,255,255,0.2)'}}>
-                    Придружаващ документ
-                  </th>
-                  <th style={{padding: '16px', color: 'white', fontWeight: '600', fontSize: '13px', textAlign: 'center', minWidth: '120px', borderRight: '1px solid rgba(255,255,255,0.2)'}}>
-                    Да се използва преди
-                  </th>
-                  <th style={{padding: '16px', color: 'white', fontWeight: '600', fontSize: '13px', textAlign: 'center', minWidth: '120px', borderRight: '1px solid rgba(255,255,255,0.2)'}}>
-                    Вид на използвания транспорт
-                  </th>
-                  <th style={{padding: '16px', color: 'white', fontWeight: '600', fontSize: '13px', textAlign: 'center', minWidth: '130px', borderRight: '1px solid rgba(255,255,255,0.2)'}}>
-                    Почистено и подредено ли е превозното средство?
-                  </th>
-                  <th style={{padding: '16px', color: 'white', fontWeight: '600', fontSize: '13px', textAlign: 'center', minWidth: '120px', borderRight: '1px solid rgba(255,255,255,0.2)'}}>
-                    <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px'}}>
-                      <Thermometer style={{height: '16px', width: '16px'}} />
-                      Температура °С
-                    </div>
-                  </th>
-                  <th style={{padding: '16px', color: 'white', fontWeight: '600', fontSize: '13px', textAlign: 'center', minWidth: '140px', borderRight: '1px solid rgba(255,255,255,0.2)'}}>
-                    Недостатъци
-                  </th>
-                  <th style={{padding: '16px', color: 'white', fontWeight: '600', fontSize: '13px', textAlign: 'center', minWidth: '150px', borderRight: '1px solid rgba(255,255,255,0.2)'}}>
-                    Отговорник подпис
-                  </th>
-                  <th style={{padding: '12px', color: 'white', fontWeight: '600', fontSize: '13px', textAlign: 'center', minWidth: '60px'}}>
-                    Действия
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {materials.map((material, index) => (
-                  <tr 
-                    key={material.id} 
-                    style={{backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8fafc'}}
-                  >
-                    <td style={{padding: '12px', borderRight: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb'}}>
-                      <input
-                        type="date"
-                        value={material.receiptDate}
-                        onChange={(e) => updateMaterial(material.id, 'receiptDate', e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '8px',
-                          border: '1px solid #E6F4EA',
-                          borderRadius: '6px',
-                          fontSize: '13px',
-                          color: '#374151'
-                        }}
-                      />
-                    </td>
-                    <td style={{padding: '12px', borderRight: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb'}}>
-                      <input
-                        type="text"
-                        value={material.materialName}
-                        onChange={(e) => updateMaterial(material.id, 'materialName', e.target.value)}
-                        list={`material-names-${material.id}`}
-                        style={{
-                          width: '100%',
-                          padding: '8px',
-                          border: '1px solid #E6F4EA',
-                          borderRadius: '6px',
-                          fontSize: '13px',
-                          color: '#374151'
-                        }}
-                        placeholder="Наименование"
-                      />
-                      <datalist id={`material-names-${material.id}`}>
-                        {savedMaterialNames.map((name, idx) => (
-                          <option key={idx} value={name} />
-                        ))}
-                      </datalist>
-                    </td>
-                    <td style={{padding: '12px', borderRight: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb'}}>
-                      <input
-                        type="text"
-                        value={material.batchNumber}
-                        onChange={(e) => updateMaterial(material.id, 'batchNumber', e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '8px',
-                          border: '1px solid #E6F4EA',
-                          borderRadius: '6px',
-                          fontSize: '13px',
-                          color: '#374151'
-                        }}
-                        placeholder="№ партида"
-                      />
-                    </td>
-                    <td style={{padding: '12px', borderRight: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb'}}>
-                      <input
-                        type="text"
-                        value={material.supplier}
-                        onChange={(e) => updateMaterial(material.id, 'supplier', e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '8px',
-                          border: '1px solid #E6F4EA',
-                          borderRadius: '6px',
-                          fontSize: '13px',
-                          color: '#374151'
-                        }}
-                        placeholder="Доставчик"
-                      />
-                    </td>
-                    <td style={{padding: '12px', borderRight: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb'}}>
-                      <input
-                        type="text"
-                        value={material.quantity}
-                        onChange={(e) => updateMaterial(material.id, 'quantity', e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '8px',
-                          border: '1px solid #E6F4EA',
-                          borderRadius: '6px',
-                          fontSize: '13px',
-                          color: '#374151'
-                        }}
-                        placeholder="Количество"
-                      />
-                    </td>
-                    <td style={{padding: '12px', borderRight: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb'}}>
-                      <input
-                        type="text"
-                        value={material.document}
-                        onChange={(e) => updateMaterial(material.id, 'document', e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '8px',
-                          border: '1px solid #E6F4EA',
-                          borderRadius: '6px',
-                          fontSize: '13px',
-                          color: '#374151'
-                        }}
-                        placeholder="Документ"
-                      />
-                    </td>
-                    <td style={{padding: '12px', borderRight: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb'}}>
-                      <input
-                        type="date"
-                        value={material.useByDate}
-                        onChange={(e) => updateMaterial(material.id, 'useByDate', e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '8px',
-                          border: '1px solid #E6F4EA',
-                          borderRadius: '6px',
-                          fontSize: '13px',
-                          color: '#374151'
-                        }}
-                      />
-                    </td>
-                    <td style={{padding: '12px', borderRight: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb'}}>
-                      <select
-                        value={material.transportType}
-                        onChange={(e) => updateMaterial(material.id, 'transportType', e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '8px',
-                          border: '1px solid #E6F4EA',
-                          borderRadius: '6px',
-                          fontSize: '13px',
-                          color: '#374151'
-                        }}
-                      >
-                        <option value="">Избери</option>
-                        <option value="Хладилен">Хладилен</option>
-                        <option value="Обикновен">Обикновен</option>
-                        <option value="Замразен">Замразен</option>
-                      </select>
-                    </td>
-                    <td style={{padding: '12px', borderRight: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb'}}>
-                      <select
-                        value={material.vehicleCleaned}
-                        onChange={(e) => updateMaterial(material.id, 'vehicleCleaned', e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '8px',
-                          border: '1px solid #E6F4EA',
-                          borderRadius: '6px',
-                          fontSize: '13px',
-                          color: '#374151'
-                        }}
-                      >
-                        <option value="">Избери</option>
-                        <option value="Да">Да</option>
-                        <option value="Не">Не</option>
-                      </select>
-                    </td>
-                    <td style={{padding: '12px', borderRight: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb'}}>
-                      <input
-                        type="number"
-                        value={material.temperature}
-                        onChange={(e) => updateMaterial(material.id, 'temperature', e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '8px',
-                          border: '1px solid #E6F4EA',
-                          borderRadius: '6px',
-                          fontSize: '13px',
-                          color: '#374151'
-                        }}
-                        placeholder="°C"
-                      />
-                    </td>
-                    <td style={{padding: '12px', borderRight: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb'}}>
-                      <textarea
-                        value={material.packagingDefects}
-                        onChange={(e) => updateMaterial(material.id, 'packagingDefects', e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '8px',
-                          border: '1px solid #E6F4EA',
-                          borderRadius: '6px',
-                          fontSize: '13px',
-                          color: '#374151',
-                          resize: 'none'
-                        }}
-                        placeholder="Недостатъци"
-                        rows="2"
-                      />
-                    </td>
-                    <td style={{padding: '12px', borderRight: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb'}}>
-                      <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-                        <button
-                          onClick={() => updateMaterial(material.id, 'accepted', !material.accepted)}
-                          style={{
-                            padding: '4px',
-                            borderRadius: '4px',
-                            color: material.accepted ? '#195E33' : '#9CA3AF',
-                            border: 'none',
-                            background: 'none',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {material.accepted ? <CheckSquare style={{height: '20px', width: '20px'}} /> : <Square style={{height: '20px', width: '20px'}} />}
-                        </button>
-                        <input
-                          type="text"
-                          value={material.responsibleSignature}
-                          onChange={(e) => updateMaterial(material.id, 'responsibleSignature', e.target.value)}
-                          list={`responsible-names-${material.id}`}
-                          style={{
-                            flex: 1,
-                            padding: '8px',
-                            border: '1px solid #E6F4EA',
-                            borderRadius: '6px',
-                            fontSize: '13px',
-                            color: '#374151'
-                          }}
-                          placeholder="Име на отговорника"
-                        />
-                        <datalist id={`responsible-names-${material.id}`}>
-                          {savedResponsibles.map((name, idx) => (
-                            <option key={idx} value={name} />
-                          ))}
-                        </datalist>
+            {/* Smart suggestions */}
+            {supplierMaterials.length > 0 && (
+              <div style={{
+                marginTop: '12px', padding: '12px', backgroundColor: DS.color.okBg,
+                border: `1px solid ${DS.color.ok}20`, borderRadius: DS.radius,
+              }}>
+                <div style={{ fontFamily: DS.font, fontSize: '11px', fontWeight: 700, color: DS.color.ok, textTransform: 'uppercase', marginBottom: '8px' }}>
+                  <Icon name="zap" size={11} color={DS.color.ok} style={{ verticalAlign: '-2px', marginRight: '4px' }} />
+                  Обикновено доставя — tap за авто-попълване
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {supplierMaterials.map(m => (
+                    <button key={m.id} onClick={() => handleAutoFill(m)} style={{
+                      padding: '8px 12px', border: `1px solid ${DS.color.ok}30`,
+                      borderRadius: DS.radius, backgroundColor: DS.color.surface, cursor: 'pointer',
+                      fontFamily: DS.font, textAlign: 'left', transition: 'all 150ms',
+                    }}>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: DS.color.graphite }}>{m.material_name}</div>
+                      <div style={{ fontSize: '11px', color: DS.color.ok, marginTop: '2px' }}>
+                        {m.typical_temp && `${m.typical_temp}°C`}{m.typical_transport && ` • ${m.typical_transport}`}
                       </div>
-                    </td>
-                    <td style={{padding: '12px', textAlign: 'center', borderBottom: '1px solid #e5e7eb'}}>
-                      {materials.length > 1 && (
-                        <button
-                          onClick={() => removeMaterial(material.id)}
-                          style={{
-                            color: '#dc2626',
-                            border: 'none',
-                            background: 'none',
-                            cursor: 'pointer',
-                            padding: '4px'
-                          }}
-                          title="Премахни запис"
-                        >
-                          <Trash2 style={{height: '16px', width: '16px'}} />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Material form */}
+            {selectedSupplier && (
+              <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px', animation: 'slideUp 0.3s ease' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <label style={{ fontFamily: DS.font, fontSize: '11px', fontWeight: 600, color: DS.color.graphiteLight, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      2. Материал / Суровина
+                    </label>
+                    {autoFilled.materialName && <AutoBadge />}
+                  </div>
+                  <input type="text" value={currentMaterial.materialName}
+                    onChange={e => setCurrentMaterial(p => ({ ...p, materialName: e.target.value }))}
+                    placeholder="Име на материал"
+                    style={{
+                      ...inputBase(false), marginTop: '4px',
+                      backgroundColor: autoFilled.materialName ? DS.color.okBg : DS.color.surfaceAlt,
+                      borderColor: autoFilled.materialName ? DS.color.ok : DS.color.borderLight,
+                    }} />
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', flexDirection: isMobile ? 'column' : 'row' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                      <label style={{ fontFamily: DS.font, fontSize: '11px', fontWeight: 600, color: DS.color.graphiteLight, textTransform: 'uppercase' }}>Температура °C</label>
+                      {autoFilled.temperature && <AutoBadge />}
+                    </div>
+                    <input type="number" value={currentMaterial.temperature}
+                      onChange={e => setCurrentMaterial(p => ({ ...p, temperature: e.target.value }))}
+                      placeholder="°C"
+                      style={{
+                        ...inputBase(false), marginTop: '4px',
+                        backgroundColor: autoFilled.temperature ? DS.color.okBg : DS.color.surfaceAlt,
+                        borderColor: autoFilled.temperature ? DS.color.ok : DS.color.borderLight,
+                      }} />
+                  </div>
+                  <ControlSelect label={<>Транспорт{autoFilled.transportType && <AutoBadge />}</>}
+                    value={currentMaterial.transportType} highlighted={autoFilled.transportType}
+                    onChange={e => setCurrentMaterial(p => ({ ...p, transportType: e.target.value }))}>
+                    <option value="">Избери...</option>
+                    <option value="Хладилен">Хладилен</option>
+                    <option value="Обикновен">Обикновен</option>
+                    <option value="Замразен">Замразен</option>
+                  </ControlSelect>
+                </div>
+
+                <div style={{
+                  padding: '10px 14px', backgroundColor: DS.color.blueBg, border: `1px solid ${DS.color.blue}20`,
+                  borderRadius: DS.radius, fontFamily: DS.font, fontSize: '12px', color: DS.color.blue,
+                }}>
+                  <strong>Попълни само:</strong> количество и партида. Останалото е автоматично.
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', flexDirection: isMobile ? 'column' : 'row' }}>
+                  <ControlInput label="3. Количество" value={currentMaterial.quantity} placeholder="напр. 25 кг"
+                    onChange={e => setCurrentMaterial(p => ({ ...p, quantity: e.target.value }))} />
+                  <ControlInput label="4. Партиден №" value={currentMaterial.batchNumber} placeholder="напр. L-2026-045"
+                    onChange={e => setCurrentMaterial(p => ({ ...p, batchNumber: e.target.value }))} />
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', flexDirection: isMobile ? 'column' : 'row' }}>
+                  <ControlInput label="Дата получаване" type="date" value={currentMaterial.receiptDate}
+                    onChange={e => setCurrentMaterial(p => ({ ...p, receiptDate: e.target.value }))} />
+                  <ControlInput label="Срок годност" type="date" value={currentMaterial.expiryDate}
+                    onChange={e => setCurrentMaterial(p => ({ ...p, expiryDate: e.target.value }))} />
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={resetMaterialForm} style={{
+                    padding: '10px 16px', border: `1px solid ${DS.color.borderLight}`, borderRadius: DS.radius,
+                    backgroundColor: 'transparent', color: DS.color.graphiteMed, fontFamily: DS.font, fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                  }}>Изчисти</button>
+                  <button onClick={handleAddMaterial} style={{
+                    flex: 1, padding: '12px', border: 'none', borderRadius: DS.radius,
+                    backgroundColor: DS.color.primary, color: 'white', fontFamily: DS.font, fontSize: '14px', fontWeight: 700, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                  }}>
+                    <Icon name="plus" size={16} color="white" /> Добави материал
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        <div style={{marginTop: '32px', backgroundColor: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb'}}>
-          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#6b7280'}}>
-            <span style={{fontWeight: '500'}}>Дата: <span style={{fontWeight: '600', color: '#195E33'}}>{currentDate}</span></span>
-            <span style={{fontWeight: '500'}}>
-              Утвърждавам: <span style={{fontWeight: '600', color: '#195E33'}}>{manager || '(Управител)'}</span>
-            </span>
+        {/* ═══ MATERIALS LIST ═══ */}
+        <div style={{
+          backgroundColor: DS.color.surface, borderRadius: DS.radius, boxShadow: DS.shadow.sm,
+          overflow: 'hidden', marginBottom: '16px', border: `1px solid ${DS.color.borderLight}`,
+        }}>
+          <SectionHeader icon="package" title={`Добавени материали (${materials.length})`} />
+
+          {materials.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: DS.color.graphiteMuted }}>
+              <Icon name="package" size={40} color={DS.color.sageMuted} style={{ margin: '0 auto 10px', display: 'block' }} />
+              <p style={{ fontFamily: DS.font, fontSize: '14px', margin: 0 }}>Няма добавени материали</p>
+              <p style={{ fontFamily: DS.font, fontSize: '12px', margin: '4px 0 0', color: DS.color.sage }}>Избери доставчик за да започнеш</p>
+            </div>
+          ) : (
+            <div style={{ padding: '8px' }}>
+              {materials.map((m, i) => (
+                <div key={m.id} style={{
+                  padding: '12px', marginBottom: '6px',
+                  backgroundColor: DS.color.surfaceAlt, border: `1px solid ${DS.color.borderLight}`,
+                  borderRadius: DS.radius, animation: 'slideUp 0.3s ease',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{
+                      fontFamily: DS.font, fontSize: '11px', fontWeight: 700, color: DS.color.primary,
+                      backgroundColor: DS.color.okBg, padding: '2px 8px', borderRadius: '8px',
+                    }}>#{i + 1}</span>
+                    <button onClick={() => handleDeleteMaterial(i)} style={{
+                      padding: '4px 8px', border: 'none', borderRadius: DS.radius,
+                      backgroundColor: DS.color.dangerBg, color: DS.color.danger,
+                      fontFamily: DS.font, fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: '4px',
+                    }}>
+                      <Icon name="trash" size={11} color={DS.color.danger} /> Изтрий
+                    </button>
+                  </div>
+                  <div style={{ fontFamily: DS.font, fontSize: '14px', fontWeight: 700, color: DS.color.graphite, marginBottom: '4px' }}>
+                    {m.materialName} • {m.quantity}
+                  </div>
+                  <div style={{ fontFamily: DS.font, fontSize: '12px', color: DS.color.graphiteMed, display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    <span style={{ padding: '1px 6px', backgroundColor: DS.color.bgWarm, borderRadius: '4px' }}>{m.supplierName}</span>
+                    <span>Партида: {m.batchNumber}</span>
+                    {m.temperature && <span style={{ padding: '1px 6px', backgroundColor: DS.color.blueBg, borderRadius: '4px', color: DS.color.blue }}>{m.temperature}°C</span>}
+                    {m.transportType && <span>{m.transportType}</span>}
+                    {m.receiptDate && <span>Пол.: {new Date(m.receiptDate).toLocaleDateString('bg-BG')}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ═══ STICKY SUBMIT BAR ═══ */}
+      {materials.length > 0 && (
+        <div style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 90,
+          backgroundColor: DS.color.surface, borderTop: `1px solid ${DS.color.borderLight}`,
+          boxShadow: '0 -4px 20px rgba(0,0,0,0.08)', padding: '12px 16px',
+        }}>
+          <div style={{ maxWidth: '800px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ flex: 1, fontFamily: DS.font, fontSize: '13px', fontWeight: 700, color: DS.color.graphite }}>
+              {materials.length} материала
+            </div>
+            <button onClick={handleFinalize} disabled={localLoading}
+              style={{
+                padding: '12px 28px', border: 'none', borderRadius: DS.radius,
+                backgroundColor: localLoading ? DS.color.graphiteMuted : DS.color.primary,
+                color: 'white', fontFamily: DS.font, fontSize: '14px', fontWeight: 700, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '8px',
+                animation: !localLoading ? 'ctrlBreathe 3s ease-in-out infinite' : 'none',
+              }}>
+              <Icon name="save" size={16} color="white" />
+              {localLoading ? 'Запазване...' : 'Финализирай'}
+            </button>
           </div>
         </div>
+      )}
+
+      {/* ═══ EXIT MODAL ═══ */}
+      {showExitConfirm && (
+        <div onClick={() => setShowExitConfirm(false)} style={{
+          position: 'fixed', inset: 0, backgroundColor: 'rgba(30,42,38,0.5)',
+          backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9998, padding: '20px',
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            backgroundColor: DS.color.surface, borderRadius: DS.radius, padding: '24px',
+            maxWidth: '400px', width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <Icon name="alert" size={20} color={DS.color.warning} />
+              <h3 style={{ margin: 0, fontFamily: DS.font, fontSize: '16px', fontWeight: 700, color: DS.color.graphite }}>Незапазени данни</h3>
+            </div>
+            <p style={{ fontFamily: DS.font, fontSize: '14px', color: DS.color.graphiteMed, lineHeight: 1.6, marginBottom: '20px' }}>
+              Имате {materials.length} незапазени материала. Какво искате?
+            </p>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <button onClick={() => setShowExitConfirm(false)} style={{
+                padding: '10px 16px', border: `1px solid ${DS.color.borderLight}`, borderRadius: DS.radius,
+                backgroundColor: 'transparent', color: DS.color.graphiteMed, fontFamily: DS.font, fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+              }}>Отказ</button>
+              <button onClick={() => confirmExit(false)} style={{
+                padding: '10px 16px', border: 'none', borderRadius: DS.radius,
+                backgroundColor: DS.color.danger, color: 'white', fontFamily: DS.font, fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+              }}>Изход без запазване</button>
+              <button onClick={() => confirmExit(true)} style={{
+                padding: '10px 16px', border: 'none', borderRadius: DS.radius,
+                backgroundColor: DS.color.primary, color: 'white', fontFamily: DS.font, fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+              }}>Запази драфт</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ NEW SUPPLIER MODAL ═══ */}
+      {showNewSupplierModal && (
+        <div onClick={() => setShowNewSupplierModal(false)} style={{
+          position: 'fixed', inset: 0, backgroundColor: 'rgba(30,42,38,0.5)',
+          backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          zIndex: 9999, padding: '16px',
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: '100%', maxWidth: '500px', backgroundColor: DS.color.surface,
+            borderRadius: '16px 16px 0 0', overflow: 'hidden', boxShadow: '0 -8px 40px rgba(0,0,0,0.15)',
+            maxHeight: '85vh', overflowY: 'auto',
+          }}>
+            {/* Header */}
+            <div style={{ backgroundColor: DS.color.primary, padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontFamily: DS.font, fontSize: '16px', fontWeight: 700, color: 'white' }}>Нов доставчик</span>
+              <button onClick={() => setShowNewSupplierModal(false)} style={{
+                width: '32px', height: '32px', borderRadius: '50%', border: 'none',
+                backgroundColor: 'rgba(255,255,255,0.2)', color: 'white', fontSize: '18px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>×</button>
+            </div>
+
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <ControlInput label="Име на доставчик *" value={newSupplier.name} placeholder="напр. Кауфланд България ЕООД"
+                onChange={e => setNewSupplier(p => ({ ...p, name: e.target.value }))} />
+              <ControlInput label="Контакт (опционално)" value={newSupplier.contactInfo} placeholder="Телефон или email"
+                onChange={e => setNewSupplier(p => ({ ...p, contactInfo: e.target.value }))} />
+
+              <div style={{ borderTop: `1px solid ${DS.color.borderLight}`, paddingTop: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <label style={{ fontFamily: DS.font, fontSize: '11px', fontWeight: 600, color: DS.color.graphiteLight, textTransform: 'uppercase' }}>
+                    Често доставяни материали
+                  </label>
+                  <button onClick={addSupplierMatRow} style={{
+                    padding: '4px 10px', border: `1px solid ${DS.color.borderLight}`, borderRadius: DS.radius,
+                    backgroundColor: 'transparent', fontFamily: DS.font, fontSize: '11px', fontWeight: 600,
+                    color: DS.color.primary, cursor: 'pointer',
+                  }}>+ Материал</button>
+                </div>
+
+                {newSupplier.materials.map((m, i) => (
+                  <div key={i} style={{
+                    display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px',
+                    padding: '8px', backgroundColor: DS.color.surfaceAlt, borderRadius: DS.radius,
+                  }}>
+                    <input type="text" placeholder="Материал" value={m.name}
+                      onChange={e => updateSupplierMat(i, 'name', e.target.value)}
+                      style={{ ...inputBase(false), flex: 1, padding: '8px 10px' }} />
+                    <input type="number" placeholder="°C" value={m.temp}
+                      onChange={e => updateSupplierMat(i, 'temp', e.target.value)}
+                      style={{ ...inputBase(false), width: '60px', padding: '8px', textAlign: 'center' }} />
+                    <select value={m.transport} onChange={e => updateSupplierMat(i, 'transport', e.target.value)}
+                      style={{ ...inputBase(false), width: '110px', padding: '8px' }}>
+                      <option value="">Транспорт</option>
+                      <option value="Хладилен">Хладилен</option>
+                      <option value="Обикновен">Обикновен</option>
+                      <option value="Замразен">Замразен</option>
+                    </select>
+                    <button onClick={() => removeSupplierMatRow(i)} style={{
+                      width: '28px', height: '28px', border: 'none', borderRadius: DS.radius,
+                      backgroundColor: DS.color.dangerBg, color: DS.color.danger, fontSize: '14px', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>×</button>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{
+                padding: '10px 14px', backgroundColor: DS.color.blueBg, border: `1px solid ${DS.color.blue}20`,
+                borderRadius: DS.radius, fontFamily: DS.font, fontSize: '12px', color: DS.color.blue,
+              }}>
+                Добавете материали за по-бързо попълване при следващите доставки.
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              padding: '16px 20px', borderTop: `1px solid ${DS.color.borderLight}`,
+              display: 'flex', gap: '8px', justifyContent: 'flex-end',
+            }}>
+              <button onClick={() => setShowNewSupplierModal(false)} style={{
+                padding: '10px 16px', border: `1px solid ${DS.color.borderLight}`, borderRadius: DS.radius,
+                backgroundColor: 'transparent', color: DS.color.graphiteMed, fontFamily: DS.font, fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+              }}>Отказ</button>
+              <button onClick={handleSaveNewSupplier} disabled={localLoading} style={{
+                padding: '10px 20px', border: 'none', borderRadius: DS.radius,
+                backgroundColor: DS.color.primary, color: 'white', fontFamily: DS.font, fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+              }}>
+                {localLoading ? 'Запазване...' : 'Създай доставчик'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ FOOTER ═══ */}
+      <div style={{
+        textAlign: 'center', padding: '20px 16px 80px', fontFamily: DS.font, fontSize: '11px', color: DS.color.graphiteMuted,
+      }}>
+        Aladin Foods © {new Date().getFullYear()} • Входящ контрол на суровини
       </div>
     </div>
   );

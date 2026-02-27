@@ -1,45 +1,78 @@
 // src/components/recipes/RecipesList.jsx
 import React, { useState, useEffect } from 'react'
-import { ChefHat, Search, Star, Users, ArrowLeft } from 'lucide-react'
 import { useLanguage } from '../../context/LanguageContext'
 import { translations } from '../../translations/translations'
 import LanguageSelector from '../../components/LanguageSelector'
 
+const DS = {
+  color: {
+    bg: '#ECEEED', surface: '#FFFFFF', surfaceAlt: '#F7F9F8',
+    primary: '#1B5E37', primaryGlow: 'rgba(27,94,55,0.08)',
+    cardHeader: '#E8F5EE',
+    graphite: '#1E2A26', graphiteMed: '#3D4F48', graphiteLight: '#6B7D76', graphiteMuted: '#95A39D',
+    border: '#D5DDD9', borderLight: '#E4EBE7',
+  },
+  font: "'DM Sans', system-ui, sans-serif",
+  radius: '0px',
+  shadow: { sm: '0 1px 3px rgba(30,42,38,0.06),0 1px 2px rgba(30,42,38,0.04)' },
+}
+const LOGO = 'https://aladinfoods.bg/assets/images/aladinfoods_logo.png'
+const CSS = `@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');*,*::before,*::after{box-sizing:border-box}body{margin:0;background:${DS.color.bg}}@keyframes cf{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}@keyframes sp{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}@media(max-width:767px){input,button,select,textarea{font-size:16px!important}}`
+
+const Ic = ({ n, sz = 16, c = 'currentColor', style: s }) => {
+  const d = {
+    back: <path d="M15 18l-6-6 6-6" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>,
+    search: <><circle cx="11" cy="11" r="8" fill="none" stroke={c} strokeWidth="2"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke={c} strokeWidth="2" strokeLinecap="round"/></>,
+    chefHat: <><path d="M6 13.87A4 4 0 017.41 6a5.11 5.11 0 011.05-1.54 5 5 0 017.08 0A5.11 5.11 0 0116.59 6 4 4 0 0118 13.87V21H6z" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><line x1="6" y1="17" x2="18" y2="17" stroke={c} strokeWidth="2"/></>,
+    inbox: <><polyline points="22 12 16 12 14 15 10 15 8 12 2 12" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>,
+    eye: <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" fill="none" stroke={c} strokeWidth="2"/><circle cx="12" cy="12" r="3" fill="none" stroke={c} strokeWidth="2"/></>,
+  }
+  return <svg width={sz} height={sz} viewBox="0 0 24 24" style={{ flexShrink: 0, display: 'block', ...s }}>{d[n]}</svg>
+}
+
+const useR = () => { const [w, sW] = useState(window.innerWidth); useEffect(() => { const h = () => sW(window.innerWidth); window.addEventListener('resize', h); return () => window.removeEventListener('resize', h) }, []); return w < 768 }
+
+const Cd = ({ children, style: s, ...rest }) => <div style={{ backgroundColor: DS.color.surface, borderRadius: DS.radius, boxShadow: DS.shadow.sm, border: `1px solid ${DS.color.borderLight}`, overflow: 'hidden', animation: 'cf 0.4s ease', ...s }} {...rest}>{children}</div>
+
 const RecipesList = ({ category, onBack, onBackToCategories }) => {
-  const { currentLanguage } = useLanguage()  // ← ПОПРАВЕНО
-  const t = translations[currentLanguage]    // ← ПОПРАВЕНО
+  const { currentLanguage } = useLanguage()
+  const t = translations[currentLanguage]
+  const mob = useR()
+  const pad = mob ? '12px' : '20px'
+
   const [selectedRecipe, setSelectedRecipe] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryRecipes, setCategoryRecipes] = useState([])
+  const [hoverId, setHoverId] = useState(null)
+  const [hoverBack, setHoverBack] = useState(false)
+  const [searchFocus, setSearchFocus] = useState(false)
 
-  // Зареждаме рецептите от избраната категория
+  // === ALL LOGIC UNCHANGED ===
   useEffect(() => {
     const loadRecipes = async () => {
       try {
-        // Динамично импортваме всички .jsx файлове от категорията
         const recipeModules = import.meta.glob('./categories/**/*.jsx')
         const recipes = []
 
-        console.log('Available recipe paths:', Object.keys(recipeModules))  // DEBUG
-        console.log('Looking for category:', category)  // DEBUG
+        console.log('Available recipe paths:', Object.keys(recipeModules))
+        console.log('Looking for category:', category)
 
         for (const path in recipeModules) {
-          // Проверяваме дали пътят съдържа избраната категория
           if (path.includes(`/categories/${category}/`)) {
-            console.log('Loading recipe from:', path)  // DEBUG
+            console.log('Loading recipe from:', path)
             const module = await recipeModules[path]()
             const fileName = path.split('/').pop().replace('.jsx', '')
-            
+
             recipes.push({
               id: fileName.toLowerCase(),
-              title: fileName.replace(/([A-Z])/g, ' $1').trim(), // "DunerOrient" -> "Duner Orient"
+              title: fileName.replace(/([A-Z])/g, ' $1').trim(),
               component: module.default,
               category: category
             })
           }
         }
 
-        console.log('Loaded recipes:', recipes)  // DEBUG
+        console.log('Loaded recipes:', recipes)
         setCategoryRecipes(recipes)
       } catch (error) {
         console.error('Error loading recipes:', error)
@@ -51,12 +84,10 @@ const RecipesList = ({ category, onBack, onBackToCategories }) => {
     }
   }, [category])
 
-  // Филтрираме по search term
   const filteredRecipes = categoryRecipes.filter(recipe =>
     recipe.title.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  // Получаваме името на категорията
   const getCategoryName = () => {
     const categoryNames = {
       duner: t.duner || 'Дюнер',
@@ -70,193 +101,165 @@ const RecipesList = ({ category, onBack, onBackToCategories }) => {
     return categoryNames[category] || category
   }
 
-  // Показваме избрана рецепта
+  // === SELECTED RECIPE VIEW ===
   if (selectedRecipe) {
     const RecipeComponent = selectedRecipe.component
-    return (
-      <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
-        <div style={{ 
-          backgroundColor: 'white',
-          borderBottom: '1px solid #e5e7eb',
-          padding: '1.25rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '1rem'
-        }}>
+    return (<><style>{CSS}</style>
+      <div style={{ minHeight: '100vh', backgroundColor: DS.color.bg, fontFamily: DS.font }}>
+        {/* Top bar for recipe view */}
+        <div style={{ position: 'sticky', top: 0, zIndex: 100, backgroundColor: DS.color.graphite, padding: '0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '48px', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
           <button
             onClick={() => setSelectedRecipe(null)}
+            onMouseEnter={() => setHoverBack(true)}
+            onMouseLeave={() => setHoverBack(false)}
             style={{
-              padding: '0.625rem 1.25rem',
-              backgroundColor: '#4b5563',
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.5rem',
-              cursor: 'pointer',
-              fontWeight: '600',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              transition: 'background-color 0.2s'
+              display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px',
+              backgroundColor: hoverBack ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.08)', borderRadius: DS.radius,
+              cursor: 'pointer', color: '#fff', fontFamily: DS.font, fontSize: '12px', fontWeight: 600,
+              transition: 'all 0.15s',
             }}
-            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#374151'}
-            onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#4b5563'}
           >
-            <ArrowLeft size={20} />
-            {t.backToList || 'Назад към списъка'}
+            <Ic n="back" sz={14} c="#fff" /> {t.backToList || 'Назад към списъка'}
           </button>
-          
           <LanguageSelector />
         </div>
         <RecipeComponent />
       </div>
-    )
+    </>)
   }
 
-  // Показваме списък с рецепти
-  return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb', padding: '1.25rem' }}>
-      <div style={{ maxWidth: '90rem', margin: '0 auto' }}>
-        
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '1rem',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-          padding: '2rem',
-          marginBottom: '2rem'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
-            <button
-              onClick={onBackToCategories}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: '#4b5563',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.375rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                transition: 'background-color 0.2s'
-              }}
-              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#374151'}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#4b5563'}
-            >
-              <ArrowLeft size={20} />
-              {t.backToCategories || 'Назад към категориите'}
-            </button>
-            
-            <LanguageSelector />
-          </div>
+  // === RECIPES LIST VIEW ===
+  return (<><style>{CSS}</style>
+    <div style={{ minHeight: '100vh', backgroundColor: DS.color.bg, fontFamily: DS.font, color: DS.color.graphite, display: 'flex', flexDirection: 'column' }}>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.25rem' }}>
-            <ChefHat size={48} style={{ color: '#166534' }} />
-            <div>
-              <h1 style={{ margin: '0 0 0.25rem 0', fontSize: '1.875rem', color: '#166534', fontWeight: 'bold' }}>
-                {t.recipes || 'Рецепти'} - {getCategoryName()}
-              </h1>
-              <p style={{ margin: 0, color: '#6b7280' }}>
-                {filteredRecipes.length} {t.recipesInCategory || 'рецепти в категорията'}
-              </p>
-            </div>
-          </div>
+      {/* DARK TOP BAR */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 100, backgroundColor: DS.color.graphite, padding: '0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '48px', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
+        <button
+          onClick={onBackToCategories}
+          onMouseEnter={() => setHoverBack(true)}
+          onMouseLeave={() => setHoverBack(false)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px',
+            backgroundColor: hoverBack ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.08)', borderRadius: DS.radius,
+            cursor: 'pointer', color: '#fff', fontFamily: DS.font, fontSize: '12px', fontWeight: 600,
+            transition: 'all 0.15s',
+          }}
+        >
+          <Ic n="back" sz={14} c="#fff" /> {t.backToCategories || 'Назад към категориите'}
+        </button>
+        <LanguageSelector />
+      </div>
 
-          <div style={{ position: 'relative' }}>
-            <Search 
-              size={20} 
-              style={{ 
-                position: 'absolute', 
-                left: '1rem', 
-                top: '50%', 
-                transform: 'translateY(-50%)',
-                color: '#9ca3af'
-              }} 
-            />
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: pad, flex: 1, width: '100%' }}>
+
+        {/* LOGO + TITLE */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: mob ? '10px' : '14px', marginBottom: '16px' }}>
+          <img src={LOGO} alt="Aladin Foods" style={{ height: mob ? '36px' : '48px', objectFit: 'contain', flexShrink: 0 }} onError={e => { e.target.style.display = 'none' }} />
+          <div>
+            <h1 style={{ fontSize: mob ? '16px' : '22px', fontWeight: 700, color: DS.color.primary, margin: 0, letterSpacing: '-0.01em', lineHeight: 1.2, textTransform: 'uppercase', fontFamily: DS.font }}>
+              {t.recipes || 'Рецепти'} — {getCategoryName()}
+            </h1>
+            <p style={{ fontFamily: DS.font, fontSize: mob ? '10px' : '12px', color: DS.color.graphiteLight, fontWeight: 500, margin: '3px 0 0' }}>
+              {filteredRecipes.length} {t.recipesInCategory || 'рецепти в категорията'}
+            </p>
+          </div>
+        </div>
+
+        {/* SEARCH */}
+        <Cd style={{ marginBottom: '12px' }}>
+          <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Ic n="search" sz={18} c={searchFocus ? DS.color.primary : DS.color.graphiteMuted} />
             <input
               type="text"
               placeholder={t.searchRecipe || 'Търси рецепта...'}
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={e => setSearchTerm(e.target.value)}
+              onFocus={() => setSearchFocus(true)}
+              onBlur={() => setSearchFocus(false)}
               style={{
-                width: '100%',
-                padding: '0.75rem 0.75rem 0.75rem 3rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.5rem',
-                fontSize: '1rem',
-                boxSizing: 'border-box'
+                flex: 1, padding: '8px 0', border: 'none', outline: 'none',
+                fontFamily: DS.font, fontSize: '14px', color: DS.color.graphite,
+                backgroundColor: 'transparent',
               }}
             />
           </div>
-        </div>
+        </Cd>
 
+        {/* RECIPES GRID */}
         {filteredRecipes.length === 0 ? (
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '1rem',
-            padding: '4rem',
-            textAlign: 'center'
-          }}>
-            <p style={{ color: '#6b7280', fontSize: '1.125rem', margin: 0 }}>
+          <Cd style={{ padding: '40px', textAlign: 'center' }}>
+            <Ic n="inbox" sz={48} c={DS.color.graphiteMuted} style={{ margin: '0 auto 12px' }} />
+            <p style={{ fontFamily: DS.font, fontSize: '14px', color: DS.color.graphiteMuted, margin: 0 }}>
               {t.noRecipesFound || 'Няма намерени рецепти'}
             </p>
-          </div>
+          </Cd>
         ) : (
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-            gap: '1.5rem'
+            gridTemplateColumns: mob ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: mob ? '8px' : '12px',
           }}>
-            {filteredRecipes.map((recipe) => (
-              <div
-                key={recipe.id}
-                onClick={() => setSelectedRecipe(recipe)}
-                style={{
-                  backgroundColor: 'white',
-                  borderRadius: '1rem',
-                  boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                  overflow: 'hidden',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  border: '2px solid transparent',
-                  padding: '1.5rem'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-5px)'
-                  e.currentTarget.style.borderColor = '#166534'
-                  e.currentTarget.style.boxShadow = '0 10px 25px rgba(22,101,52,0.2)'
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.borderColor = 'transparent'
-                  e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)'
-                }}
-              >
-                <ChefHat size={48} style={{ color: '#166534', marginBottom: '1rem' }} />
-                <h3 style={{
-                  margin: '0 0 0.625rem 0',
-                  fontSize: '1.25rem',
-                  color: '#166534',
-                  fontWeight: 'bold'
-                }}>
-                  {recipe.title}
-                </h3>
-                
-                <p style={{
-                  margin: 0,
-                  color: '#6b7280',
-                  fontSize: '0.875rem'
-                }}>
-                  {t.clickToView || 'Кликни за преглед'}
-                </p>
-              </div>
-            ))}
+            {filteredRecipes.map((recipe, idx) => {
+              const isHov = hoverId === recipe.id
+              return (
+                <Cd
+                  key={recipe.id}
+                  onClick={() => setSelectedRecipe(recipe)}
+                  onMouseEnter={() => setHoverId(recipe.id)}
+                  onMouseLeave={() => setHoverId(null)}
+                  style={{
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    border: isHov ? `2px solid ${DS.color.primary}` : `1px solid ${DS.color.borderLight}`,
+                    transform: isHov ? 'translateY(-5px)' : 'translateY(0)',
+                    boxShadow: isHov ? `0 10px 25px rgba(27,94,55,0.15)` : DS.shadow.sm,
+                    animationDelay: `${Math.min(idx * 40, 400)}ms`,
+                    animationFillMode: 'both',
+                    padding: mob ? '14px' : '20px',
+                  }}
+                >
+                  <div style={{
+                    width: mob ? 40 : 48, height: mob ? 40 : 48,
+                    backgroundColor: DS.color.cardHeader,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    marginBottom: mob ? '8px' : '12px',
+                    border: `1px solid ${DS.color.primary}22`,
+                    transition: 'transform 0.2s',
+                    transform: isHov ? 'scale(1.1)' : 'scale(1)',
+                  }}>
+                    <Ic n="chefHat" sz={mob ? 20 : 26} c={DS.color.primary} />
+                  </div>
+
+                  <h3 style={{
+                    margin: `0 0 ${mob ? '4px' : '8px'} 0`,
+                    fontFamily: DS.font,
+                    fontSize: mob ? '13px' : '16px',
+                    color: DS.color.primary,
+                    fontWeight: 700,
+                  }}>
+                    {recipe.title}
+                  </h3>
+
+                  <p style={{
+                    margin: 0,
+                    fontFamily: DS.font,
+                    color: DS.color.graphiteMuted,
+                    fontSize: mob ? '10px' : '12px',
+                  }}>
+                    {t.clickToView || 'Кликни за преглед'}
+                  </p>
+                </Cd>
+              )
+            })}
           </div>
         )}
       </div>
-    </div>
-  )
+
+      {/* FOOTER */}
+      <div style={{ textAlign: 'center', padding: mob ? '16px 12px' : '20px 24px', color: DS.color.graphiteMuted, fontFamily: DS.font, fontSize: '11px', fontWeight: 500, borderTop: `1px solid ${DS.color.borderLight}`, marginTop: 'auto' }}>© 2026 Aladin Foods | by MG</div>
+    </div></>)
 }
 
 export default RecipesList

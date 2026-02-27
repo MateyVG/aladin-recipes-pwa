@@ -2,950 +2,158 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import ImprovedSubmissionDetail from './ImprovedSubmissionDetail'
+import IncomingControlDetail from './IncomingControlDetail'
 
-const AllSubmissionsHistory = ({ restaurantId, onBack }) => {
-  const [submissions, setSubmissions] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [selectedSubmission, setSelectedSubmission] = useState(null)
-  const [filters, setFilters] = useState({
-    startDate: '',
-    endDate: '',
-    departmentId: '',
-    templateId: '',
-    searchTerm: ''
-  })
-  const [departments, setDepartments] = useState([])
-  const [templates, setTemplates] = useState([])
+const DS = {
+  color: {
+    bg: '#ECEEED', surface: '#FFFFFF', surfaceAlt: '#F7F9F8',
+    primary: '#1B5E37', primaryLight: '#2D7A4F', primaryGlow: 'rgba(27,94,55,0.08)',
+    cardHeader: '#E8F5EE',
+    graphite: '#1E2A26', graphiteMed: '#3D4F48', graphiteLight: '#6B7D76', graphiteMuted: '#95A39D',
+    ok: '#1B8A50', okBg: '#E8F5EE',
+    warning: '#C47F17', danger: '#C53030', dangerBg: '#FEF2F2',
+    info: '#2563EB', infoBg: '#EFF6FF',
+    incoming: '#7C3AED', incomingBg: '#F5F3FF',
+    pendingBg: '#F0F2F1', border: '#D5DDD9', borderLight: '#E4EBE7',
+  },
+  font: "'DM Sans', system-ui, sans-serif", radius: '0px',
+  shadow: { sm: '0 1px 3px rgba(30,42,38,0.06),0 1px 2px rgba(30,42,38,0.04)' },
+}
+const LOGO = 'https://aladinfoods.bg/assets/images/aladinfoods_logo.png'
+const CSS = `@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');*,*::before,*::after{box-sizing:border-box}body{margin:0;background:${DS.color.bg}}@keyframes cf{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}@keyframes sp{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}@media(max-width:767px){input,button,select,textarea{font-size:16px!important}}::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:${DS.color.graphiteMuted}}`
 
-  useEffect(() => {
-    loadFiltersData()
-    loadSubmissions()
-  }, [restaurantId, filters])
-
-  const loadFiltersData = async () => {
-    try {
-      // Load departments
-      const { data: deptData } = await supabase
-        .from('departments')
-        .select('id, name')
-        .eq('restaurant_id', restaurantId)
-        .eq('active', true)
-        .order('name')
-      
-      setDepartments(deptData || [])
-
-      // Load templates
-      const { data: templatesData } = await supabase
-        .from('restaurant_templates')
-        .select('checklist_templates(id, name)')
-        .eq('restaurant_id', restaurantId)
-        .eq('enabled', true)
-
-      const uniqueTemplates = templatesData
-        ?.map(rt => rt.checklist_templates)
-        .filter((t, i, arr) => arr.findIndex(x => x.id === t.id) === i) || []
-      
-      setTemplates(uniqueTemplates)
-    } catch (error) {
-      console.error('Error loading filters:', error)
-    }
-  }
-
-  const loadSubmissions = async () => {
-    setLoading(true)
-    try {
-      let query = supabase
-        .from('checklist_submissions')
-        .select(`
-          *,
-          checklist_templates(id, name, description, config),
-          departments(id, name),
-          profiles(full_name, email)
-        `)
-        .eq('restaurant_id', restaurantId)
-        .order('submission_date', { ascending: false })
-        .order('submitted_at', { ascending: false })
-
-      if (filters.startDate) {
-        query = query.gte('submission_date', filters.startDate)
-      }
-      if (filters.endDate) {
-        query = query.lte('submission_date', filters.endDate)
-      }
-      if (filters.departmentId) {
-        query = query.eq('department_id', filters.departmentId)
-      }
-      if (filters.templateId) {
-        query = query.eq('template_id', filters.templateId)
-      }
-
-      const { data, error } = await query
-
-      if (error) throw error
-
-      // Client-side search filter
-      let filteredData = data || []
-      if (filters.searchTerm) {
-        const searchLower = filters.searchTerm.toLowerCase()
-        filteredData = filteredData.filter(sub => 
-          sub.checklist_templates?.name?.toLowerCase().includes(searchLower) ||
-          sub.departments?.name?.toLowerCase().includes(searchLower) ||
-          sub.profiles?.full_name?.toLowerCase().includes(searchLower) ||
-          JSON.stringify(sub.data).toLowerCase().includes(searchLower)
-        )
-      }
-
-      setSubmissions(filteredData)
-    } catch (error) {
-      console.error('Error loading submissions:', error)
-      alert('Грешка при зареждане на история')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const formatDate = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('bg-BG', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    })
-  }
-
-  const formatTime = (dateString) => {
-    return new Date(dateString).toLocaleTimeString('bg-BG', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    })
-  }
-
-  const getSubmissionSummary = (submission) => {
-    const data = submission.data || {}
-    const rowCount = data.rows?.length || 0
-    const headerFields = Object.keys(data.header || {}).length
-    
-    return `${rowCount} реда, ${headerFields} полета`
-  }
-
-  const exportToCSV = () => {
-    const BOM = '\uFEFF'
-    const headers = ['Дата', 'Час', 'Отдел', 'Чек лист', 'Попълнил', 'Брой редове']
-    
-    const csvData = [
-      headers.join(','),
-      ...submissions.map(sub => [
-        sub.submission_date,
-        formatTime(sub.submitted_at),
-        sub.departments?.name || '',
-        sub.checklist_templates?.name || '',
-        sub.profiles?.full_name || sub.profiles?.email || '',
-        sub.data?.rows?.length || 0
-      ].map(field => `"${field}"`).join(','))
-    ].join('\n')
-
-    const blob = new Blob([BOM + csvData], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `история_${new Date().toISOString().split('T')[0]}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
-  }
-
-  if (selectedSubmission) {
-    console.log('Selected submission:', selectedSubmission)
-    console.log('Submission data:', selectedSubmission.data)
-    console.log('Template config:', selectedSubmission.checklist_templates?.config)
-    
-    return (
-      <ImprovedSubmissionDetail
-        submission={selectedSubmission}
-        onBack={() => setSelectedSubmission(null)}
-      />
-    )
-  }
-
-  return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f0f4f8', padding: '20px' }}>
-      <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-        
-        {/* Header */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-          padding: '30px',
-          marginBottom: '20px'
-        }}>
-          <button
-            onClick={onBack}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#6b7280',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              marginBottom: '20px'
-            }}
-          >
-            ← Назад
-          </button>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
-            <div>
-              <h1 style={{ margin: '0 0 10px 0', fontSize: '28px', color: '#1a5d33' }}>
-                📋 Пълна история на чек листи
-              </h1>
-              <p style={{ margin: 0, color: '#6b7280' }}>
-                {submissions.length} записа от всички отдели
-              </p>
-            </div>
-            
-            <button
-              onClick={exportToCSV}
-              disabled={submissions.length === 0}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: submissions.length === 0 ? '#9ca3af' : '#059669',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: submissions.length === 0 ? 'not-allowed' : 'pointer',
-                fontWeight: '600',
-                fontSize: '14px'
-              }}
-            >
-              📥 Експорт CSV
-            </button>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-          padding: '25px',
-          marginBottom: '20px'
-        }}>
-          <h3 style={{ margin: '0 0 20px 0', color: '#1a5d33' }}>🔍 Филтри:</h3>
-          
-          <div style={{ 
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '15px',
-            marginBottom: '15px'
-          }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
-                От дата:
-              </label>
-              <input
-                type="date"
-                value={filters.startDate}
-                onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '14px'
-                }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
-                До дата:
-              </label>
-              <input
-                type="date"
-                value={filters.endDate}
-                onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '14px'
-                }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
-                Отдел:
-              </label>
-              <select
-                value={filters.departmentId}
-                onChange={(e) => setFilters({ ...filters, departmentId: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '14px'
-                }}
-              >
-                <option value="">Всички</option>
-                {departments.map(dept => (
-                  <option key={dept.id} value={dept.id}>{dept.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
-                Чек лист:
-              </label>
-              <select
-                value={filters.templateId}
-                onChange={(e) => setFilters({ ...filters, templateId: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '14px'
-                }}
-              >
-                <option value="">Всички</option>
-                {templates.map(tmpl => (
-                  <option key={tmpl.id} value={tmpl.id}>{tmpl.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <input
-              type="text"
-              placeholder="🔎 Търсене в съдържанието..."
-              value={filters.searchTerm}
-              onChange={(e) => setFilters({ ...filters, searchTerm: e.target.value })}
-              style={{
-                flex: 1,
-                padding: '10px',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '14px'
-              }}
-            />
-            <button
-              onClick={() => setFilters({
-                startDate: '',
-                endDate: '',
-                departmentId: '',
-                templateId: '',
-                searchTerm: ''
-              })}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: '#6b7280',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontWeight: '600',
-                fontSize: '14px'
-              }}
-            >
-              Изчисти
-            </button>
-          </div>
-        </div>
-
-        {/* Results */}
-        {loading ? (
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            padding: '40px',
-            textAlign: 'center'
-          }}>
-            <p style={{ color: '#6b7280' }}>Зареждане...</p>
-          </div>
-        ) : submissions.length === 0 ? (
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            padding: '40px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '48px', marginBottom: '15px' }}>📭</div>
-            <p style={{ color: '#6b7280', fontSize: '16px', margin: 0 }}>
-              Няма намерени записи с текущите филтри
-            </p>
-          </div>
-        ) : (
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-            overflow: 'hidden'
-          }}>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{
-                    background: 'linear-gradient(135deg, #1a5d33, #2d7a4f)',
-                    color: 'white'
-                  }}>
-                    <th style={{ padding: '15px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>
-                      Дата
-                    </th>
-                    <th style={{ padding: '15px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>
-                      Час
-                    </th>
-                    <th style={{ padding: '15px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>
-                      Отдел
-                    </th>
-                    <th style={{ padding: '15px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>
-                      Чек лист
-                    </th>
-                    <th style={{ padding: '15px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>
-                      Попълнил
-                    </th>
-                    <th style={{ padding: '15px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>
-                      Съдържание
-                    </th>
-                    <th style={{ padding: '15px', textAlign: 'center', fontSize: '14px', fontWeight: '600' }}>
-                      Действия
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {submissions.map((submission, idx) => (
-                    <tr 
-                      key={submission.id}
-                      style={{
-                        backgroundColor: idx % 2 === 0 ? 'white' : '#f9fafb',
-                        borderBottom: '1px solid #e5e7eb',
-                        cursor: 'pointer',
-                        transition: 'background-color 0.2s'
-                      }}
-                      onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f0fdf4'}
-                      onMouseOut={(e) => e.currentTarget.style.backgroundColor = idx % 2 === 0 ? 'white' : '#f9fafb'}
-                      onClick={() => setSelectedSubmission(submission)}
-                    >
-                      <td style={{ padding: '12px 15px', fontSize: '14px' }}>
-                        {formatDate(submission.submission_date)}
-                      </td>
-                      <td style={{ padding: '12px 15px', fontSize: '14px', color: '#6b7280' }}>
-                        {formatTime(submission.submitted_at)}
-                      </td>
-                      <td style={{ padding: '12px 15px', fontSize: '14px' }}>
-                        <span style={{
-                          padding: '4px 10px',
-                          backgroundColor: '#e0f2fe',
-                          color: '#0369a1',
-                          borderRadius: '6px',
-                          fontSize: '13px',
-                          fontWeight: '600'
-                        }}>
-                          {submission.departments?.name || '-'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 15px', fontSize: '14px', fontWeight: '600', color: '#1a5d33' }}>
-                        {submission.checklist_templates?.name || '-'}
-                      </td>
-                      <td style={{ padding: '12px 15px', fontSize: '14px', color: '#6b7280' }}>
-                        {submission.profiles?.full_name || submission.profiles?.email || 'Неизвестен'}
-                      </td>
-                      <td style={{ padding: '12px 15px', fontSize: '13px', color: '#9ca3af' }}>
-                        {getSubmissionSummary(submission)}
-                      </td>
-                      <td style={{ padding: '12px 15px', textAlign: 'center' }}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            console.log('Button clicked! Submission:', submission)
-                            setSelectedSubmission(submission)
-                          }}
-                          style={{
-                            padding: '6px 16px',
-                            backgroundColor: '#1a5d33',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '13px',
-                            fontWeight: '600'
-                          }}
-                        >
-                          Преглед
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
+const Ic = ({ n, sz = 16, c = 'currentColor', style: s }) => {
+  const d = { back: <path d="M15 18l-6-6 6-6" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>, download: <><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"/><polyline points="7 10 12 15 17 10" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><line x1="12" y1="15" x2="12" y2="3" stroke={c} strokeWidth="2" strokeLinecap="round"/></>, filter: <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>, x: <><line x1="18" y1="6" x2="6" y2="18" stroke={c} strokeWidth="2" strokeLinecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke={c} strokeWidth="2" strokeLinecap="round"/></>, eye: <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" fill="none" stroke={c} strokeWidth="2"/><circle cx="12" cy="12" r="3" fill="none" stroke={c} strokeWidth="2"/></>, cb: <><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2" fill="none" stroke={c} strokeWidth="2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1" fill="none" stroke={c} strokeWidth="2"/></>, truck: <><rect x="1" y="3" width="15" height="13" fill="none" stroke={c} strokeWidth="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" fill="none" stroke={c} strokeWidth="2"/><circle cx="5.5" cy="18.5" r="2.5" fill="none" stroke={c} strokeWidth="2"/><circle cx="18.5" cy="18.5" r="2.5" fill="none" stroke={c} strokeWidth="2"/></> }
+  return <svg width={sz} height={sz} viewBox="0 0 24 24" style={{ flexShrink: 0, display: 'block', ...s }}>{d[n]}</svg>
 }
 
-// Universal SubmissionDetail - works with any data structure
-const SubmissionDetail = ({ submission, onBack }) => {
-  const config = submission.checklist_templates?.config || {}
-  const data = submission.data || {}
-  const [pdfLoading, setPdfLoading] = useState(false)
+const useR = () => { const [w, sW] = useState(window.innerWidth); useEffect(() => { const h = () => sW(window.innerWidth); window.addEventListener('resize', h); return () => window.removeEventListener('resize', h) }, []); return w < 768 }
+const iB = (f) => ({ width: '100%', padding: '10px 12px', backgroundColor: f ? DS.color.surface : DS.color.surfaceAlt, border: `1.5px solid ${f ? DS.color.primary : DS.color.borderLight}`, borderRadius: DS.radius, fontSize: '14px', fontFamily: DS.font, fontWeight: 400, color: DS.color.graphite, outline: 'none', transition: 'all 150ms', boxShadow: f ? `0 0 0 3px ${DS.color.primaryGlow}` : 'none', boxSizing: 'border-box', WebkitAppearance: 'none' })
 
-  const exportToPDF = async () => {
-    setPdfLoading(true)
-    
-    try {
-      if (!window.html2pdf) {
-        const script = document.createElement('script')
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
-        script.async = true
-        
-        await new Promise((resolve, reject) => {
-          script.onload = resolve
-          script.onerror = reject
-          document.head.appendChild(script)
-        })
-      }
+const DI = ({ label, type = 'text', value, onChange, placeholder, style: s, ...r }) => { const [f, sF] = useState(false); return <div style={{ minWidth: 0, flex: 1, ...s }}>{label && <label style={{ display: 'block', fontFamily: DS.font, fontSize: '11px', fontWeight: 600, color: f ? DS.color.primary : DS.color.graphiteLight, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>{label}</label>}<input type={type} value={value} onChange={onChange} placeholder={placeholder} onFocus={() => sF(true)} onBlur={() => sF(false)} style={iB(f)} {...r} /></div> }
+const DSel = ({ label, value, onChange, children, style: s }) => { const [f, sF] = useState(false); return <div style={{ minWidth: 0, flex: 1, ...s }}>{label && <label style={{ display: 'block', fontFamily: DS.font, fontSize: '11px', fontWeight: 600, color: f ? DS.color.primary : DS.color.graphiteLight, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>{label}</label>}<select value={value} onChange={onChange} onFocus={() => sF(true)} onBlur={() => sF(false)} style={{ ...iB(f), cursor: 'pointer', appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2395A39D' stroke-width='1.5' fill='none'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center', paddingRight: '28px' }}>{children}</select></div> }
 
-      const element = document.getElementById('pdf-content')
-      
-      const opt = {
-        margin: 10,
-        filename: `checklist_${submission.checklist_templates?.name}_${submission.submission_date}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      }
-      
-      await window.html2pdf().set(opt).from(element).save()
-      
-    } catch (error) {
-      console.error('PDF export error:', error)
-      alert('Грешка при генериране на PDF: ' + error.message)
-    } finally {
-      setPdfLoading(false)
-    }
+const Btn = ({ children, onClick, disabled: dis, variant: vr = 'primary', icon: ic, sm, style: s }) => { const V = { primary: [DS.color.primary, '#fff', 'none'], ghost: [DS.color.pendingBg, DS.color.graphiteMed, `1px solid ${DS.color.borderLight}`], outline: ['transparent', DS.color.primary, `1.5px solid ${DS.color.primary}`], incoming: [DS.color.incoming, '#fff', 'none'] }; const v = V[vr] || V.primary; return <button onClick={onClick} disabled={dis} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: sm ? '6px 12px' : '10px 18px', backgroundColor: dis ? DS.color.graphiteMuted : v[0], color: dis ? '#fff' : v[1], border: dis ? 'none' : v[2], borderRadius: DS.radius, fontFamily: DS.font, fontSize: sm ? '11px' : '13px', fontWeight: 600, cursor: dis ? 'not-allowed' : 'pointer', transition: 'all 150ms', minHeight: sm ? '30px' : '40px', ...s }}>{ic && <Ic n={ic} sz={sm ? 12 : 14} c={dis ? '#fff' : v[1]} />}{children}</button> }
+
+const SH = ({ icon: ic, title, right }) => <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', backgroundColor: DS.color.cardHeader, borderBottom: `1px solid ${DS.color.borderLight}` }}><div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>{ic && <Ic n={ic} sz={18} c={DS.color.primary} />}<span style={{ fontFamily: DS.font, fontSize: '13px', fontWeight: 700, color: DS.color.primary, textTransform: 'uppercase', letterSpacing: '0.03em' }}>{title}</span></div>{right}</div>
+const Cd = ({ children, style: s, ...rest }) => <div style={{ backgroundColor: DS.color.surface, borderRadius: DS.radius, boxShadow: DS.shadow.sm, border: `1px solid ${DS.color.borderLight}`, overflow: 'hidden', animation: 'cf 0.4s ease', ...s }} {...rest}>{children}</div>
+
+const AllSubmissionsHistory = ({ restaurantId, onBack }) => {
+  const mob = useR(); const pad = mob ? '12px' : '20px'
+  const [subs, setSubs] = useState([]); const [ld, setLd] = useState(true)
+  const [sel, setSel] = useState(null)
+  const [flt, setFlt] = useState({ startDate: '', endDate: '', departmentId: '', templateId: '', searchTerm: '' })
+  const [depts, setDepts] = useState([]); const [tmpls, setTmpls] = useState([])
+
+  useEffect(() => { loadFD(); loadSubs() }, [restaurantId, flt])
+
+  const loadFD = async () => { try { const { data: dd } = await supabase.from('departments').select('id,name').eq('restaurant_id', restaurantId).eq('active', true).order('name'); setDepts(dd || []); const { data: td } = await supabase.from('restaurant_templates').select('checklist_templates(id,name)').eq('restaurant_id', restaurantId).eq('enabled', true); setTmpls(td?.map(r => r.checklist_templates).filter((t, i, a) => a.findIndex(x => x.id === t.id) === i) || []) } catch (e) { console.error(e) } }
+
+  const loadSubs = async () => {
+    setLd(true); try {
+      let q = supabase.from('checklist_submissions').select('*,checklist_templates(id,name,description,config),departments(id,name),profiles(full_name,email)').eq('restaurant_id', restaurantId).order('submission_date', { ascending: false }).order('submitted_at', { ascending: false })
+      if (flt.startDate) q = q.gte('submission_date', flt.startDate); if (flt.endDate) q = q.lte('submission_date', flt.endDate)
+      if (flt.departmentId) q = q.eq('department_id', flt.departmentId); if (flt.templateId) q = q.eq('template_id', flt.templateId)
+      const { data: cd, error: ce } = await q; if (ce) throw ce
+      let iq = supabase.from('incoming_control_records').select('*,incoming_control_materials(*)').order('control_date', { ascending: false })
+      if (flt.startDate) iq = iq.gte('control_date', flt.startDate); if (flt.endDate) iq = iq.lte('control_date', flt.endDate)
+      const { data: id2, error: ie } = await iq
+      const cr = (cd || []).map(r => ({ ...r, type: 'checklist', display_date: r.submission_date, display_title: r.checklist_templates?.name || 'Checklist', display_department: r.departments?.name || '-' }))
+      const ir = (!ie && id2) ? id2.map(r => ({ ...r, type: 'incoming', display_date: r.control_date, display_title: 'Входящ контрол', display_department: 'Operations' })) : []
+      let all = [...cr, ...ir].sort((a, b) => new Date(b.display_date) - new Date(a.display_date))
+      if (flt.searchTerm) { const s = flt.searchTerm.toLowerCase(); all = all.filter(x => x.type === 'checklist' ? (x.checklist_templates?.name?.toLowerCase().includes(s) || x.departments?.name?.toLowerCase().includes(s) || x.profiles?.full_name?.toLowerCase().includes(s) || JSON.stringify(x.data).toLowerCase().includes(s)) : (x.display_title.toLowerCase().includes(s) || x.supplier?.toLowerCase().includes(s) || JSON.stringify(x.incoming_control_materials).toLowerCase().includes(s))) }
+      setSubs(all)
+    } catch (e) { console.error(e); alert('Грешка при зареждане') } finally { setLd(false) }
   }
 
-  // Render any value (string, number, array, object)
-  const renderValue = (value, depth = 0) => {
-    if (value === null || value === undefined || value === '') return '-'
-    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-      return String(value)
-    }
-    if (Array.isArray(value)) {
-      if (value.length === 0) return '-'
-      
-      // Check if this is an array of objects with same keys (table-like data)
-      const isTableData = value.length > 0 && 
-        typeof value[0] === 'object' && 
-        value[0] !== null &&
-        !Array.isArray(value[0]) &&
-        value.every(item => typeof item === 'object' && item !== null)
-      
-      if (isTableData && depth < 2) {
-        // Render as table
-        const allKeys = [...new Set(value.flatMap(item => Object.keys(item)))]
-        const displayKeys = allKeys.filter(k => k !== 'id') // Skip ID column for cleaner view
-        
-        return (
-          <div style={{ overflowX: 'auto', margin: '10px 0' }}>
-            <table style={{ 
-              width: '100%', 
-              borderCollapse: 'collapse',
-              border: '1px solid #1a5d33',
-              fontSize: '11px'
-            }}>
-              <thead>
-                <tr style={{ 
-                  background: '#1a5d33',
-                  color: 'white'
-                }}>
-                  <th style={{
-                    padding: '8px 6px',
-                    border: '1px solid rgba(255,255,255,0.3)',
-                    textAlign: 'center',
-                    fontWeight: '700'
-                  }}>
-                    №
-                  </th>
-                  {displayKeys.map(key => (
-                    <th key={key} style={{
-                      padding: '8px 6px',
-                      border: '1px solid rgba(255,255,255,0.3)',
-                      textAlign: 'left',
-                      fontWeight: '700',
-                      textTransform: 'capitalize'
-                    }}>
-                      {key.replace(/([A-Z])/g, ' $1').trim()}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {value.map((item, idx) => (
-                  <tr key={idx} style={{
-                    backgroundColor: idx % 2 === 0 ? 'white' : '#f9fafb'
-                  }}>
-                    <td style={{
-                      padding: '6px',
-                      border: '1px solid #e5e7eb',
-                      textAlign: 'center',
-                      fontWeight: 'bold',
-                      color: '#1a5d33'
-                    }}>
-                      {idx + 1}
-                    </td>
-                    {displayKeys.map(key => (
-                      <td key={key} style={{
-                        padding: '6px',
-                        border: '1px solid #e5e7eb',
-                        textAlign: 'left'
-                      }}>
-                        {renderValue(item[key], depth + 2)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
-      }
-      
-      // Regular array - render as list
-      if (depth > 2) return `[${value.length} елемента]`
-      return (
-        <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
-          {value.map((item, idx) => (
-            <li key={idx}>{renderValue(item, depth + 1)}</li>
-          ))}
-        </ul>
-      )
-    }
-    if (typeof value === 'object') {
-      if (depth > 2) return '[Object]'
-      return (
-        <div style={{ marginLeft: depth > 0 ? '15px' : '0' }}>
-          {Object.entries(value).map(([k, v]) => (
-            <div key={k} style={{ marginBottom: '5px' }}>
-              <strong>{k}:</strong> {renderValue(v, depth + 1)}
-            </div>
-          ))}
-        </div>
-      )
-    }
-    return String(value)
-  }
+  const fd = d => new Date(d).toLocaleDateString('bg-BG', { year: 'numeric', month: 'long', day: 'numeric' })
+  const fds = d => new Date(d).toLocaleDateString('bg-BG', { day: '2-digit', month: '2-digit' })
+  const ft = d => new Date(d).toLocaleTimeString('bg-BG', { hour: '2-digit', minute: '2-digit' })
+  const gs = s => `${s.data?.rows?.length || 0} реда`
 
-  // Check if this is standard format (header + rows)
-  const hasStandardFormat = data.header && data.rows && config.columns
+  const csv = () => { const c = ['Дата,Час,Отдел,Чек лист,Попълнил,Редове', ...subs.map(s => [s.submission_date, ft(s.submitted_at), s.departments?.name || '', s.checklist_templates?.name || '', s.profiles?.full_name || '', s.data?.rows?.length || 0].map(f => `"${f}"`).join(','))].join('\n'); const b = new Blob(['\uFEFF' + c], { type: 'text/csv;charset=utf-8' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `история_${new Date().toISOString().split('T')[0]}.csv`; a.click(); URL.revokeObjectURL(u) }
 
-  return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f0f4f8', padding: '20px' }}>
-      <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-        
-        {/* Action Buttons */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-          padding: '20px',
-          marginBottom: '20px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '15px'
-        }}>
-          <button
-            onClick={onBack}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: '#6b7280',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontWeight: '600',
-              fontSize: '14px'
-            }}
-          >
-            Назад към списъка
-          </button>
+  if (sel) { console.log('Selected:', sel, 'Type:', sel.type); if (sel.type === 'incoming') return <IncomingControlDetail record={sel} onBack={() => setSel(null)} />; return <ImprovedSubmissionDetail submission={sel} onBack={() => setSel(null)} /> }
 
-          <button
-            onClick={exportToPDF}
-            disabled={pdfLoading}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: pdfLoading ? '#9ca3af' : '#dc2626',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: pdfLoading ? 'not-allowed' : 'pointer',
-              fontWeight: '600',
-              fontSize: '14px'
-            }}
-          >
-            {pdfLoading ? 'Генериране...' : 'Експорт PDF'}
-          </button>
-        </div>
+  const nC = subs.filter(s => s.type === 'checklist').length, nI = subs.filter(s => s.type === 'incoming').length
 
-        {/* PDF Content */}
-        <div id="pdf-content" style={{
-          backgroundColor: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-          padding: '40px',
-          marginBottom: '20px'
-        }}>
-          {/* Header */}
-          <div style={{
-            borderBottom: '3px solid #1a5d33',
-            paddingBottom: '20px',
-            marginBottom: '30px'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '15px' }}>
-              <div style={{ flex: 1 }}>
-                <h1 style={{ margin: '0 0 5px 0', fontSize: '22px', color: '#1a5d33', fontWeight: 'bold' }}>
-                  {submission.checklist_templates?.name || 'Чек лист'}
-                </h1>
-                {submission.checklist_templates?.description && (
-                  <p style={{ margin: 0, fontSize: '13px', color: '#6b7280' }}>
-                    {submission.checklist_templates.description}
-                  </p>
-                )}
-              </div>
-            </div>
-            
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-              gap: '15px',
-              fontSize: '13px',
-              padding: '15px',
-              backgroundColor: '#f9fafb',
-              borderRadius: '6px'
-            }}>
-              <div>
-                <strong>Отдел:</strong> {submission.departments?.name}
-              </div>
-              <div>
-                <strong>Дата:</strong> {new Date(submission.submission_date).toLocaleDateString('bg-BG')}
-              </div>
-              <div>
-                <strong>Попълнил:</strong> {submission.profiles?.full_name || submission.profiles?.email}
-              </div>
-              <div>
-                <strong>Време:</strong> {new Date(submission.submitted_at).toLocaleTimeString('bg-BG')}
-              </div>
-            </div>
-          </div>
+  return (<><style>{CSS}</style>
+    <div style={{ minHeight: '100vh', backgroundColor: DS.color.bg, fontFamily: DS.font, color: DS.color.graphite, display: 'flex', flexDirection: 'column' }}>
 
-          {/* Content */}
-          {hasStandardFormat ? (
-            /* Standard format with header + rows */
-            <>
-              {/* Header Fields */}
-              {data.header && Object.keys(data.header).length > 0 && (
-                <div style={{ marginBottom: '30px' }}>
-                  <h3 style={{ 
-                    margin: '0 0 15px 0', 
-                    fontSize: '16px', 
-                    color: '#1a5d33',
-                    borderBottom: '2px solid #e5e7eb',
-                    paddingBottom: '8px'
-                  }}>
-                    Основна информация
-                  </h3>
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                    gap: '12px' 
-                  }}>
-                    {Object.entries(data.header).map(([key, value]) => (
-                      <div key={key} style={{
-                        padding: '12px',
-                        backgroundColor: '#f9fafb',
-                        borderRadius: '6px',
-                        border: '1px solid #e5e7eb'
-                      }}>
-                        <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px', fontWeight: '600' }}>
-                          {config.header_fields?.find(f => f.key === key)?.label || key}:
-                        </div>
-                        <div style={{ fontSize: '14px', color: '#1a5d33', fontWeight: '600' }}>
-                          {value || '-'}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Table Data */}
-              {data.rows && data.rows.length > 0 && (
-                <div style={{ marginBottom: '30px' }}>
-                  <h3 style={{ 
-                    margin: '0 0 15px 0', 
-                    fontSize: '16px', 
-                    color: '#1a5d33',
-                    borderBottom: '2px solid #e5e7eb',
-                    paddingBottom: '8px'
-                  }}>
-                    Записи ({data.rows.length} {data.rows.length === 1 ? 'ред' : 'реда'})
-                  </h3>
-                  
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ 
-                      width: '100%', 
-                      borderCollapse: 'collapse',
-                      border: '2px solid #1a5d33',
-                      fontSize: '12px'
-                    }}>
-                      <thead>
-                        <tr style={{ 
-                          background: 'linear-gradient(135deg, #1a5d33, #2d7a4f)',
-                          color: 'white'
-                        }}>
-                          {config.columns?.map(col => (
-                            <th key={col.key} style={{
-                              padding: '10px 8px',
-                              border: '1px solid rgba(255,255,255,0.3)',
-                              textAlign: 'center',
-                              fontSize: '11px',
-                              fontWeight: '700',
-                              textTransform: 'uppercase'
-                            }}>
-                              {col.label}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.rows.map((row, rowIndex) => (
-                          <tr key={rowIndex} style={{
-                            backgroundColor: rowIndex % 2 === 0 ? 'white' : '#f9fafb'
-                          }}>
-                            {config.columns?.map(col => {
-                              let displayValue = row[col.key]
-                              
-                              if (displayValue === undefined || displayValue === null || displayValue === '') {
-                                displayValue = '-'
-                              }
-                              
-                              if (col.type === 'select' && col.options && displayValue !== '-') {
-                                const option = col.options.find(opt => opt.value === displayValue)
-                                displayValue = option?.label || displayValue
-                              }
-                              
-                              return (
-                                <td key={col.key} style={{
-                                  padding: '8px',
-                                  border: '1px solid #e5e7eb',
-                                  fontSize: '12px',
-                                  textAlign: col.type === 'auto_number' ? 'center' : 'left',
-                                  fontWeight: col.type === 'auto_number' ? 'bold' : 'normal',
-                                  color: col.type === 'auto_number' ? '#1a5d33' : '#374151'
-                                }}>
-                                  {displayValue}
-                                </td>
-                              )
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            /* Custom/Advanced format - render all data as structured view */
-            <div style={{ marginBottom: '30px' }}>              
-              {Object.entries(data).map(([key, value]) => {
-                // Skip rendering metadata fields in separate section
-                const isMetadata = ['objectName', 'companyName', 'savedOilTypes', 'savedEmployees', 'savedInspectors', 'customRefrigerators'].includes(key)
-                
-                return (
-                  <div key={key} style={{ marginBottom: '25px' }}>
-                    <h3 style={{ 
-                      margin: '0 0 15px 0', 
-                      fontSize: '16px', 
-                      color: '#1a5d33',
-                      borderBottom: '2px solid #e5e7eb',
-                      paddingBottom: '8px',
-                      textTransform: 'capitalize'
-                    }}>
-                      {key.replace(/([A-Z])/g, ' $1').trim()}
-                    </h3>
-                    
-                    <div style={{
-                      padding: isMetadata ? '15px' : '0',
-                      backgroundColor: isMetadata ? '#f9fafb' : 'transparent',
-                      borderRadius: '8px',
-                      border: isMetadata ? '1px solid #e5e7eb' : 'none',
-                      fontSize: '13px',
-                      lineHeight: '1.8'
-                    }}>
-                      {renderValue(value)}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {/* Footer */}
-          <div style={{
-            marginTop: '40px',
-            paddingTop: '20px',
-            borderTop: '1px solid #e5e7eb',
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '30px',
-            fontSize: '12px'
-          }}>
-            <div>
-              <div style={{ marginBottom: '30px', color: '#6b7280' }}>Попълнил:</div>
-              <div style={{ borderBottom: '1px solid #374151', paddingBottom: '5px', marginBottom: '5px' }}>
-                {submission.profiles?.full_name || submission.profiles?.email}
-              </div>
-              <div style={{ fontSize: '10px', color: '#9ca3af' }}>
-                Име и подпис
-              </div>
-            </div>
-            <div>
-              <div style={{ marginBottom: '30px', color: '#6b7280' }}>Проверил:</div>
-              <div style={{ borderBottom: '1px solid #374151', paddingBottom: '5px', marginBottom: '5px' }}>
-                &nbsp;
-              </div>
-              <div style={{ fontSize: '10px', color: '#9ca3af' }}>
-                Име и подпис
-              </div>
-            </div>
-          </div>
-
-          <div style={{
-            marginTop: '30px',
-            paddingTop: '15px',
-            borderTop: '1px solid #e5e7eb',
-            fontSize: '10px',
-            color: '#9ca3af',
-            textAlign: 'center'
-          }}>
-            Документът е генериран на {new Date().toLocaleString('bg-BG')} | 
-            Оригинален запис от {new Date(submission.submitted_at).toLocaleString('bg-BG')}
-          </div>
-        </div>
+      <div style={{ position: 'sticky', top: 0, zIndex: 100, backgroundColor: DS.color.graphite, padding: '0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '48px', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
+        <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px', backgroundColor: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: DS.radius, color: 'white', fontSize: '12px', fontFamily: DS.font, fontWeight: 600, cursor: 'pointer' }}><Ic n="back" sz={14} c="white" /> Назад</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: '#4ADE80' }} /><span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: 600 }}>Online</span></div>
+        <span style={{ backgroundColor: 'rgba(255,255,255,0.08)', padding: '4px 10px', fontFamily: DS.font, fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>{subs.length} записа</span>
       </div>
-    </div>
-  )
+
+      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: pad, flex: 1, width: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: mob ? '10px' : '14px' }}>
+            <img src={LOGO} alt="Aladin Foods" style={{ height: mob ? '36px' : '48px', objectFit: 'contain', flexShrink: 0 }} onError={e => { e.target.style.display = 'none' }} />
+            <div>
+              <h1 style={{ fontSize: mob ? '16px' : '22px', fontWeight: 700, color: DS.color.primary, margin: 0, letterSpacing: '-0.01em', lineHeight: 1.2, textTransform: 'uppercase', fontFamily: DS.font }}>Пълна история</h1>
+              <p style={{ fontFamily: DS.font, fontSize: mob ? '10px' : '12px', color: DS.color.graphiteLight, fontWeight: 500, margin: '3px 0 0' }}>Чек листи и входящ контрол от всички отдели</p>
+            </div>
+          </div>
+          <Btn onClick={csv} disabled={subs.length === 0} ic="download" vr="outline" sm>CSV</Btn>
+        </div>
+
+        <Cd style={{ marginBottom: '12px' }}>
+          <SH icon="filter" title="Филтри" />
+          <div style={{ padding: pad }}>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr 1fr' : 'repeat(4,1fr)', gap: '12px', marginBottom: '12px' }}>
+              <DI label="От дата" type="date" value={flt.startDate} onChange={e => setFlt({ ...flt, startDate: e.target.value })} />
+              <DI label="До дата" type="date" value={flt.endDate} onChange={e => setFlt({ ...flt, endDate: e.target.value })} />
+              <DSel label="Отдел" value={flt.departmentId} onChange={e => setFlt({ ...flt, departmentId: e.target.value })}><option value="">Всички</option>{depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</DSel>
+              <DSel label="Чек лист" value={flt.templateId} onChange={e => setFlt({ ...flt, templateId: e.target.value })}><option value="">Всички</option>{tmpls.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</DSel>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <DI value={flt.searchTerm} onChange={e => setFlt({ ...flt, searchTerm: e.target.value })} placeholder="Търсене..." style={{ flex: 1 }} />
+              <Btn onClick={() => setFlt({ startDate: '', endDate: '', departmentId: '', templateId: '', searchTerm: '' })} vr="ghost" ic="x" sm>Изчисти</Btn>
+            </div>
+          </div>
+        </Cd>
+
+        {ld ? (<Cd><div style={{ padding: '40px', textAlign: 'center' }}><div style={{ width: 36, height: 36, border: `3px solid ${DS.color.borderLight}`, borderTop: `3px solid ${DS.color.primary}`, borderRadius: '50%', animation: 'sp 0.8s linear infinite', margin: '0 auto 12px' }} /><p style={{ fontFamily: DS.font, fontSize: '12px', color: DS.color.graphiteLight, margin: 0, fontWeight: 600, textTransform: 'uppercase' }}>Зареждане...</p></div></Cd>
+        ) : subs.length === 0 ? (<Cd><div style={{ padding: '40px', textAlign: 'center' }}><Ic n="cb" sz={48} c={DS.color.graphiteMuted} style={{ margin: '0 auto 12px' }} /><p style={{ fontFamily: DS.font, fontSize: '14px', color: DS.color.graphiteMuted, margin: 0 }}>Няма записи с тези филтри</p></div></Cd>
+        ) : (
+          <Cd>
+            <SH icon="cb" title={`Записи (${subs.length})`} right={<span style={{ fontFamily: DS.font, fontSize: '10px', color: DS.color.graphiteMuted, fontWeight: 600 }}>{nC} чек листи • {nI} входящи</span>} />
+            {!mob ? (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: DS.font, fontSize: '12px' }}>
+                  <thead><tr style={{ backgroundColor: DS.color.cardHeader }}>{['Дата', 'Час', 'Тип', 'Чек лист', 'Попълнил', 'Данни', ''].map(h => <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: '9px', fontWeight: 700, color: DS.color.graphiteMuted, textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: `2px solid ${DS.color.borderLight}` }}>{h}</th>)}</tr></thead>
+                  <tbody>{subs.map((s, i) => { const isI = s.type === 'incoming', bg = isI ? DS.color.incomingBg : (i % 2 === 0 ? DS.color.surface : DS.color.surfaceAlt); return (
+                    <tr key={`${s.type}-${s.id}`} style={{ borderBottom: `1px solid ${DS.color.borderLight}`, backgroundColor: bg, cursor: 'pointer', transition: 'background-color 150ms' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = isI ? '#EDE9FE' : DS.color.okBg} onMouseLeave={e => e.currentTarget.style.backgroundColor = bg} onClick={() => setSel(s)}>
+                      <td style={{ padding: '10px 12px', fontWeight: 500 }}>{fd(s.display_date)}</td>
+                      <td style={{ padding: '10px 12px', color: DS.color.graphiteLight }}>{ft(isI ? s.created_at : s.submitted_at)}</td>
+                      <td style={{ padding: '10px 12px' }}><span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', fontSize: '10px', fontWeight: 700, backgroundColor: isI ? DS.color.incomingBg : DS.color.infoBg, color: isI ? DS.color.incoming : DS.color.info, border: `1px solid ${isI ? DS.color.incoming : DS.color.info}22` }}><Ic n={isI ? 'truck' : 'cb'} sz={10} c={isI ? DS.color.incoming : DS.color.info} />{isI ? 'Входящ' : (s.departments?.name || '—')}</span></td>
+                      <td style={{ padding: '10px 12px', fontWeight: 600, color: isI ? DS.color.incoming : DS.color.primary }}>{s.display_title}</td>
+                      <td style={{ padding: '10px 12px', color: DS.color.graphiteLight }}>{isI ? (s.supplier || '—') : (s.profiles?.full_name || s.profiles?.email || '—')}</td>
+                      <td style={{ padding: '10px 12px', fontSize: '11px', color: DS.color.graphiteMuted }}>{isI ? `${s.incoming_control_materials?.length || 0} мат.` : gs(s)}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center' }}><button onClick={e => { e.stopPropagation(); setSel(s) }} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', backgroundColor: isI ? DS.color.incoming : DS.color.primary, color: '#fff', border: 'none', borderRadius: DS.radius, cursor: 'pointer', fontFamily: DS.font, fontSize: '10px', fontWeight: 700 }}><Ic n="eye" sz={11} c="#fff" />Виж</button></td>
+                    </tr>) })}</tbody>
+                </table>
+              </div>
+            ) : (
+              <div style={{ padding: '6px' }}>{subs.map((s, i) => { const isI = s.type === 'incoming'; return (
+                <div key={`${s.type}-${s.id}`} onClick={() => setSel(s)} style={{ padding: '12px', margin: '4px', backgroundColor: isI ? DS.color.incomingBg : (i % 2 === 0 ? DS.color.surface : DS.color.surfaceAlt), border: `1px solid ${DS.color.borderLight}`, cursor: 'pointer', animation: 'cf 0.3s ease', animationDelay: `${Math.min(i * 30, 300)}ms`, animationFillMode: 'both' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontFamily: DS.font, fontSize: '13px', fontWeight: 700, color: isI ? DS.color.incoming : DS.color.primary, display: 'flex', alignItems: 'center', gap: '6px' }}><Ic n={isI ? 'truck' : 'cb'} sz={14} c={isI ? DS.color.incoming : DS.color.primary} />{s.display_title}</span>
+                    <span style={{ fontFamily: DS.font, fontSize: '10px', fontWeight: 600, padding: '2px 6px', backgroundColor: isI ? DS.color.incomingBg : DS.color.okBg, color: isI ? DS.color.incoming : DS.color.primary }}>{isI ? 'Входящ' : (s.departments?.name || '—')}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: DS.font, fontSize: '11px', color: DS.color.graphiteLight }}>
+                    <span>{fds(s.display_date)} • {ft(isI ? s.created_at : s.submitted_at)}</span>
+                    <span style={{ fontWeight: 600 }}>{isI ? `${s.incoming_control_materials?.length || 0} мат.` : gs(s)}</span>
+                  </div>
+                </div>) })}</div>
+            )}
+          </Cd>
+        )}
+      </div>
+
+      <div style={{ textAlign: 'center', padding: mob ? '16px 12px' : '20px 24px', color: DS.color.graphiteMuted, fontFamily: DS.font, fontSize: '11px', fontWeight: 500, borderTop: `1px solid ${DS.color.borderLight}`, marginTop: 'auto' }}>© 2026 Aladin Foods | by MG</div>
+    </div></>)
 }
 
 export default AllSubmissionsHistory
