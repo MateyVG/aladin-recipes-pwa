@@ -3,6 +3,8 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase, dbService } from '../lib/supabase'
 import { syncService, offlineDB } from '../lib/offlineDB'
 
+console.log('>>> AuthContext MODULE LOADED')
+
 const AuthContext = createContext({})
 
 export const useAuth = () => {
@@ -19,20 +21,29 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
   const [offline, setOffline] = useState(!navigator.onLine)
 
+  console.log('>>> AuthProvider RENDER, loading:', loading)
+
   useEffect(() => {
-    // Get initial session
+    console.log('>>> useEffect START - calling getSession...')
+    
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('>>> getSession DONE, user:', session?.user?.id || 'NO USER')
       setUser(session?.user ?? null)
       if (session?.user) {
         loadUserProfile(session.user.id)
       } else {
+        console.log('>>> No user - setting loading=false')
         setLoading(false)
       }
+    }).catch(err => {
+      console.error('>>> getSession FAILED:', err)
+      setLoading(false)
     })
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('>>> onAuthStateChange:', event)
         setUser(session?.user ?? null)
         if (session?.user) {
           await loadUserProfile(session.user.id)
@@ -44,7 +55,9 @@ export const AuthProvider = ({ children }) => {
     )
 
     // Initialize sync listeners
+    console.log('>>> calling syncService.initSyncListeners...')
     syncService.initSyncListeners()
+    console.log('>>> syncService.initSyncListeners DONE')
 
     // Listen for online/offline events
     const handleOnline = () => setOffline(false)
@@ -61,28 +74,37 @@ export const AuthProvider = ({ children }) => {
   }, [])
 
   const loadUserProfile = async (userId) => {
+    console.log('>>> loadUserProfile START:', userId)
     try {
+      console.log('>>> calling dbService.getUserProfile...')
       const { data, error } = await dbService.getUserProfile(userId)
+      console.log('>>> getUserProfile DONE, data:', !!data, 'error:', error)
       if (error) throw error
       
       setProfile(data)
+      console.log('>>> profile SET, calling storeLocally...')
       
       // Store profile locally for offline access
       await syncService.storeLocally('profiles', data)
+      console.log('>>> storeLocally profiles DONE')
       
       // If user is a manager and doesn't have a restaurant, create one
       if (data.role === 'manager' && !data.restaurant_id) {
+        console.log('>>> creating initial setup...')
         await createInitialSetup(data)
       } else if (data.restaurants) {
+        console.log('>>> storing restaurant locally...')
         // Store restaurant and departments locally
         await syncService.storeLocally('restaurants', data.restaurants)
+        console.log('>>> loading departments...')
         const { data: departments } = await dbService.getDepartments(data.restaurants.id)
         if (departments) {
           await syncService.storeLocally('departments', departments)
         }
+        console.log('>>> departments DONE')
       }
     } catch (error) {
-      console.error('Error loading profile:', error)
+      console.error('>>> loadUserProfile ERROR:', error)
       // Try to load from local storage if offline
       if (!navigator.onLine) {
         const localProfiles = await syncService.getLocalData('profiles')
@@ -92,6 +114,7 @@ export const AuthProvider = ({ children }) => {
         }
       }
     } finally {
+      console.log('>>> loadUserProfile FINALLY - setting loading=false')
       setLoading(false)
     }
   }
