@@ -81,11 +81,7 @@ const ControlInput = ({ label, type = 'text', value, onChange, placeholder, styl
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   TEMP SLIDER — хоризонтален плъзгач с цветна зона
-   - Плъзгаш с пръст → live update
-   - Зелена зона = допустим диапазон
-   - Tap на числото → ръчен input
-   - Стъпка 0.1°C
+   TEMP SLIDER
    ═══════════════════════════════════════════════════════════════ */
 const TempSlider = ({ label, value, onChange, isWarning, accentColor, glowColor, targetTemp, isMobile }) => {
   const [manualMode, setManualMode] = useState(false);
@@ -94,7 +90,6 @@ const TempSlider = ({ label, value, onChange, isWarning, accentColor, glowColor,
   const numVal = value !== '' ? parseFloat(value) : null;
   const hasVal = numVal !== null && !isNaN(numVal);
 
-  // Parse target range
   const parseRange = () => {
     if (!targetTemp) return { lo: -5, hi: 10, okLo: 0, okHi: 4 };
     const t = targetTemp.trim();
@@ -121,7 +116,6 @@ const TempSlider = ({ label, value, onChange, isWarning, accentColor, glowColor,
   const sliderMin = Math.round(range.lo * 10) / 10;
   const sliderMax = Math.round(range.hi * 10) / 10;
 
-  // OK zone position as percentage
   const toPercent = (v) => ((v - sliderMin) / (sliderMax - sliderMin)) * 100;
   const okLeft = Math.max(0, toPercent(range.okLo));
   const okRight = Math.min(100, toPercent(range.okHi));
@@ -146,15 +140,12 @@ const TempSlider = ({ label, value, onChange, isWarning, accentColor, glowColor,
     setManualMode(false);
   };
 
-  // Determine thumb color
   const thumbColor = !hasVal ? DS.color.graphiteMuted : isWarning ? DS.color.danger : DS.color.ok;
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', minWidth: 0 }}>
-      {/* Label */}
       <div style={{ fontFamily: DS.font, fontSize: '10px', fontWeight: 700, color: DS.color.graphiteMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</div>
 
-      {/* Temperature display — tap for manual */}
       <div onClick={enterManual} style={{
         padding: '6px 12px', borderRadius: DS.radius, cursor: 'pointer',
         backgroundColor: isWarning ? DS.color.dangerBg : hasVal ? `${accentColor}10` : 'transparent',
@@ -183,20 +174,16 @@ const TempSlider = ({ label, value, onChange, isWarning, accentColor, glowColor,
         )}
       </div>
 
-      {/* Slider track with OK zone */}
       <div style={{ width: '100%', position: 'relative', height: '32px', display: 'flex', alignItems: 'center' }}>
-        {/* Track background */}
         <div style={{
           position: 'absolute', left: 0, right: 0, height: '8px', top: '50%', transform: 'translateY(-50%)',
           backgroundColor: DS.color.borderLight, borderRadius: '4px', overflow: 'hidden',
         }}>
-          {/* OK zone highlight */}
           <div style={{
             position: 'absolute', top: 0, bottom: 0,
             left: `${okLeft}%`, width: `${okRight - okLeft}%`,
             backgroundColor: 'rgba(27,138,80,0.25)', borderRadius: '4px',
           }} />
-          {/* Filled track up to thumb */}
           {hasVal && (
             <div style={{
               position: 'absolute', top: 0, bottom: 0, left: 0,
@@ -207,7 +194,6 @@ const TempSlider = ({ label, value, onChange, isWarning, accentColor, glowColor,
           )}
         </div>
 
-        {/* Range input */}
         <input type="range"
           min={sliderMin} max={sliderMax} step={0.1}
           value={hasVal ? numVal : (sliderMin + sliderMax) / 2}
@@ -219,7 +205,6 @@ const TempSlider = ({ label, value, onChange, isWarning, accentColor, glowColor,
             background: 'transparent', cursor: 'pointer',
           }} />
 
-        {/* Scoped thumb styling */}
         <style>{`
           .${sliderId}::-webkit-slider-thumb {
             -webkit-appearance: none; appearance: none;
@@ -245,13 +230,11 @@ const TempSlider = ({ label, value, onChange, isWarning, accentColor, glowColor,
         `}</style>
       </div>
 
-      {/* Min/Max labels */}
       <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', padding: '0 2px' }}>
         <span style={{ fontFamily: DS.font, fontSize: '9px', color: DS.color.graphiteMuted }}>{sliderMin}°</span>
         <span style={{ fontFamily: DS.font, fontSize: '9px', color: DS.color.graphiteMuted }}>{sliderMax}°</span>
       </div>
 
-      {/* Status */}
       {isWarning && hasVal && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '3px', animation: 'warnPulse 2s infinite' }}>
           <AlertTriangle style={{ width: 10, height: 10, color: DS.color.danger }} />
@@ -269,7 +252,7 @@ const TempSlider = ({ label, value, onChange, isWarning, accentColor, glowColor,
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   REFRIGERATOR CARD — като на снимката
+   REFRIGERATOR CARD
    ═══════════════════════════════════════════════════════════════ */
 const FridgeCard = ({
   fridge, blockId, timeSlots, getReading, updateReading, getTemperatureStatus,
@@ -291,7 +274,6 @@ const FridgeCard = ({
       overflow: 'hidden', transition: 'all 200ms ease',
       animation: 'ctrlFadeIn 300ms ease-out both', animationDelay: `${index * 60}ms`,
     }}>
-      {/* ─── Header ─── */}
       <div style={{
         padding: isMobile ? '12px 14px' : '14px 18px',
         backgroundColor: theme.bg,
@@ -320,7 +302,6 @@ const FridgeCard = ({
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-            {/* Range badge */}
             <div style={{
               padding: '5px 12px', backgroundColor: DS.color.surface,
               border: `2px solid ${theme.accent}`, borderRadius: DS.radius,
@@ -333,7 +314,6 @@ const FridgeCard = ({
                 <>Диапазон: {fridge.temp}</>
               )}
             </div>
-            {/* Edit toggle */}
             <button onClick={() => onToggleEdit(fridge.id)} title={isEditing ? 'Готово' : 'Редактирай'}
               style={{
                 background: isEditing ? theme.accent : 'transparent',
@@ -347,7 +327,6 @@ const FridgeCard = ({
           </div>
         </div>
 
-        {/* Edit mode: type select + description + remove */}
         {isEditing && (
           <div style={{
             marginTop: '12px', padding: '12px', backgroundColor: DS.color.surface,
@@ -377,7 +356,6 @@ const FridgeCard = ({
           </div>
         )}
 
-        {/* Description if has one and not editing */}
         {!isEditing && fridge.description && (
           <div style={{ marginTop: '8px', fontFamily: DS.font, fontSize: '11px', color: DS.color.graphiteMuted, fontStyle: 'italic' }}>
             {fridge.description}
@@ -385,7 +363,6 @@ const FridgeCard = ({
         )}
       </div>
 
-      {/* ─── Temperature readings — big numbers ─── */}
       <div style={{
         padding: isMobile ? '16px 12px' : '20px 18px',
         display: 'flex', gap: isMobile ? '8px' : '16px',
@@ -428,7 +405,6 @@ const RefrigeratorStorageControl = ({ template, config, department, restaurantId
   const [syncStatus, setSyncStatus] = useState('');
   const [editingIds, setEditingIds] = useState(new Set());
 
-  /* Defaults — description е ПРАЗЕН сега, потребителят го попълва */
   const [refrigerators, setRefrigerators] = useState([
     { id: '1', name: '№1 - Хладилник', temp: '0-4°C', description: '', type: 'positive', _isCustom: false },
     { id: '2', name: '№2 - Хладилник', temp: '0-4°C', description: '', type: 'positive', _isCustom: false },
@@ -444,9 +420,9 @@ const RefrigeratorStorageControl = ({ template, config, department, restaurantId
   const [savedInspectors, setSavedInspectors] = useState([]);
 
   const currentDate = new Date().toISOString().split('T')[0];
-  const timeSlots = ['8h', '14h', '20h'];
+  const timeSlots = ['8h', '20h'];
 
-  useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
+  useEffect(() => { const t = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(t); }, []);
 
   const flash = (msg) => { setAutoSaveStatus(msg); setTimeout(() => setAutoSaveStatus(''), 3000); };
 
@@ -472,10 +448,9 @@ const RefrigeratorStorageControl = ({ template, config, department, restaurantId
     return () => { window.removeEventListener('online', goOn); window.removeEventListener('offline', goOff); };
   }, []);
 
-  /* ─── hasAnyData ─── */
   const hasAnyData = () => dateBlocks.some(b => b.date || Object.keys(b.readings).some(k => b.readings[k]));
 
-  /* ─── Config: refrigerators + savedInspectors ─── */
+  /* ─── Config ─── */
   const loadSavedConfig = async () => {
     try {
       const c = localStorage.getItem(`config_${template.id}_${restaurantId}`);
@@ -520,7 +495,7 @@ const RefrigeratorStorageControl = ({ template, config, department, restaurantId
   const handleBackClick = () => { hasAnyData() ? setShowExitConfirm(true) : onBack?.(); };
   const confirmExit = (save) => { if (save) saveDraft(); setShowExitConfirm(false); onBack?.(); };
 
-  /* ─── Refrigerator CRUD — всички са editable, не само custom ─── */
+  /* ─── Refrigerator CRUD ─── */
   const addRefrigerator = () => {
     const newId = Date.now().toString();
     setRefrigerators([...refrigerators, { id: newId, name: `№${refrigerators.length + 1} - Хладилник`, temp: '0-4°C', description: '', type: 'positive', _isCustom: true }]);
@@ -539,7 +514,6 @@ const RefrigeratorStorageControl = ({ template, config, department, restaurantId
 
   const updateRefrigerator = (id, f, v) => {
     if (f === '_batch') {
-      // Batch update — обновява няколко полета наведнъж
       setRefrigerators(refrigerators.map(r => r.id === id ? { ...r, ...v } : r));
     } else {
       setRefrigerators(refrigerators.map(r => r.id === id ? { ...r, [f]: v } : r));
@@ -551,7 +525,6 @@ const RefrigeratorStorageControl = ({ template, config, department, restaurantId
       const s = new Set(prev);
       if (s.has(id)) {
         s.delete(id);
-        // Запазваме конфигурацията при затваряне на edit mode
         setTimeout(() => saveConfigLocally(), 0);
       } else {
         s.add(id);
@@ -572,23 +545,17 @@ const RefrigeratorStorageControl = ({ template, config, department, restaurantId
     const v = parseFloat(temp); if (isNaN(v)) return 'normal';
     const t = targetTemp.trim();
 
-    // 1) ≤ число (напр. "≤ -18°C", "до -18°C") → стойността трябва ≤ число
     if (t.includes('≤') || t.toLowerCase().includes('до')) {
       const num = t.match(/-?\d+\.?\d*/);
       if (num) return v <= parseFloat(num[0]) ? 'normal' : 'warning';
     }
 
-    // 2) ≥ число (напр. "≥ 63°C", "над 63°C") → стойността трябва ≥ число
     if (t.includes('≥') || t.toLowerCase().includes('над')) {
       const num = t.match(/-?\d+\.?\d*/);
       if (num) return v >= parseFloat(num[0]) ? 'normal' : 'warning';
     }
 
-    // 3) Диапазон — парсваме внимателно
-    // Заменяме разделители (-, ÷, до, ~) с | за split
     const normalized = t.replace(/°C/g, '').replace(/\s/g, '');
-    // Търсим pattern: число-разделител-число (напр. "0-4", "2÷6", "-2-4")
-    // Ключова идея: разделителят е тире МЕЖДУ две числа, не е минус
     const rangeMatch = normalized.match(/^(-?\d+\.?\d*)[-÷~](\d+\.?\d*)$/);
     if (rangeMatch) {
       const lo = parseFloat(rangeMatch[1]);
@@ -596,7 +563,6 @@ const RefrigeratorStorageControl = ({ template, config, department, restaurantId
       return (v >= Math.min(lo, hi) && v <= Math.max(lo, hi)) ? 'normal' : 'warning';
     }
 
-    // Fallback: извличаме числа разделени с нечислови символи
     const parts = t.replace(/[°C]/g, '').split(/[÷~\s]+/).filter(Boolean);
     const numbers = [];
     for (const p of parts) {
@@ -609,7 +575,6 @@ const RefrigeratorStorageControl = ({ template, config, department, restaurantId
       return (v >= lo && v <= hi) ? 'normal' : 'warning';
     }
 
-    // Не можем да валидираме
     return 'normal';
   };
 
@@ -662,7 +627,7 @@ const RefrigeratorStorageControl = ({ template, config, department, restaurantId
             {autoSaveStatus && <span style={{ fontFamily: DS.font, fontSize: '11px', color: syncStatus === 'error' ? 'rgba(255,200,200,0.9)' : DS.color.ok, display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}><CheckCircle style={{ width: 12, height: 12 }} />{isMobile ? '✓' : autoSaveStatus}</span>}
             {hasDraft && !isMobile && <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(255,255,255,0.08)', padding: '4px 10px', borderRadius: DS.radius }}><FileText style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.5)' }} /><span style={{ fontFamily: DS.font, fontSize: '10px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>Драфт</span></div>}
             <span style={{ fontFamily: DS.font, fontSize: isMobile ? '11px' : '12px', fontWeight: 500, color: 'rgba(255,255,255,0.4)' }}>
-              {now.toLocaleString('bg-BG', { hour: '2-digit', minute: '2-digit', ...(isMobile ? {} : { second: '2-digit' }), day: '2-digit', month: '2-digit', ...(isMobile ? {} : { year: 'numeric' }), hour12: false })}
+              {now.toLocaleDateString('bg-BG', { day: '2-digit', month: '2-digit', year: 'numeric' })}
             </span>
           </div>
         </div>
@@ -676,7 +641,7 @@ const RefrigeratorStorageControl = ({ template, config, department, restaurantId
               <img src={LOGO_URL} alt="Aladin Foods" style={{ height: isMobile ? '36px' : '48px', width: 'auto', objectFit: 'contain' }} />
               <div>
                 <h1 style={{ fontSize: isMobile ? '15px' : '22px', fontWeight: 700, color: DS.color.primary, margin: 0, textTransform: 'uppercase', fontFamily: DS.font }}>КОНТРОЛНА КАРТА</h1>
-                <p style={{ fontFamily: DS.font, fontSize: isMobile ? '10px' : '12px', color: DS.color.graphiteLight, margin: '2px 0 0' }}>ХЛАДИЛНО СЪХРАНЕНИЕ • Отчитане 8:00 / 14:00 / 20:00</p>
+                <p style={{ fontFamily: DS.font, fontSize: isMobile ? '10px' : '12px', color: DS.color.graphiteLight, margin: '2px 0 0' }}>ХЛАДИЛНО СЪХРАНЕНИЕ • Отчитане 8:00 / 20:00</p>
               </div>
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -704,7 +669,6 @@ const RefrigeratorStorageControl = ({ template, config, department, restaurantId
           {dateBlocks.map((block, bi) => (
             <div key={block.id} style={{ marginBottom: '32px', animation: 'ctrlFadeIn 300ms ease-out both', animationDelay: `${bi * 100}ms` }}>
 
-              {/* Date bar */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 18px', marginBottom: '16px', backgroundColor: DS.color.graphite, borderRadius: DS.radius }}>
                 <Calendar style={{ width: 18, height: 18, color: 'rgba(255,255,255,0.6)', flexShrink: 0 }} />
                 <input type="date" value={block.date} onChange={e => updateDateBlock(block.id, 'date', e.target.value)}
@@ -721,7 +685,6 @@ const RefrigeratorStorageControl = ({ template, config, department, restaurantId
                 )}
               </div>
 
-              {/* Fridge cards */}
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(340px, 1fr))',
@@ -737,7 +700,6 @@ const RefrigeratorStorageControl = ({ template, config, department, restaurantId
                 ))}
               </div>
 
-              {/* КД + Проверил */}
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: '14px' }}>
                 <div style={{ backgroundColor: DS.color.surface, borderRadius: DS.radius, border: `1px solid ${DS.color.borderLight}`, overflow: 'hidden', boxShadow: DS.shadow.sm }}>
                   <div style={{ padding: '10px 16px', backgroundColor: DS.color.cardHeader, borderBottom: `1px solid ${DS.color.borderLight}`, display: 'flex', alignItems: 'center', gap: '8px' }}>

@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { 
   Save, Plus, Trash2, CheckSquare, Square, Building2, Calendar, 
   Users, ClipboardCheck, CheckCircle, RotateCcw, FileText, 
-  AlertCircle, ChevronLeft
+  AlertCircle, ChevronLeft, CheckCheck
 } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════════
@@ -85,7 +85,6 @@ const ControlInput = ({ label, type = 'text', value, onChange, placeholder, styl
   );
 };
 
-/* Badge за обозначения (Т, 2С, С, ПН, М) */
 const FreqBadge = ({ code }) => (
   <span style={{
     fontFamily: DS.font, fontWeight: 700, fontSize: '12px',
@@ -95,7 +94,6 @@ const FreqBadge = ({ code }) => (
   }}>{code}</span>
 );
 
-/* Чекбокс бутон */
 const CheckBtn = ({ checked, onClick }) => (
   <button onClick={onClick} style={{
     background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
@@ -109,7 +107,7 @@ const CheckBtn = ({ checked, onClick }) => (
 );
 
 /* ═══════════════════════════════════════════════════════════════
-   MAIN COMPONENT — Логика 1:1 от оригинала
+   MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════ */
 const HygieneWorkCard = ({ template, config, department, restaurantId, onBack }) => {
   const { isMobile, isTablet } = useResponsive();
@@ -117,7 +115,6 @@ const HygieneWorkCard = ({ template, config, department, restaurantId, onBack })
   const [loading, setLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
   const [hygieneType, setHygieneType] = useState('Т/ 2С / С / ПН / М');
-  const [manager, setManager] = useState('');
   const [autoSaveStatus, setAutoSaveStatus] = useState('');
   const [hasDraft, setHasDraft] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
@@ -130,34 +127,30 @@ const HygieneWorkCard = ({ template, config, department, restaurantId, onBack })
     { id: '1', name: '1. Зона за подготовка', areas: [
       { name: 'Под,сифони', cleaning: 'Т', washing: 'Т', disinfection: '2С' },
       { name: 'Стени', cleaning: 'Т', washing: 'С', disinfection: 'ПН' },
-      { name: 'Таван', cleaning: 'С', washing: 'С', disinfection: 'ПН' },
       { name: 'Врати', cleaning: 'Т', washing: 'Т', disinfection: 'ПН' },
       { name: 'Контактниповърхности', cleaning: 'Т', washing: '2С', disinfection: '2С' }
     ]},
     { id: '2', name: '2. Зона за готов продукт', areas: [
       { name: 'Под,сифони', cleaning: 'Т', washing: 'Т', disinfection: '2С' },
       { name: 'Стени', cleaning: 'Т', washing: 'С', disinfection: 'ПН' },
-      { name: 'Таван', cleaning: 'С', washing: 'С', disinfection: 'ПН' },
       { name: 'Врати', cleaning: 'Т', washing: 'Т', disinfection: 'ПН' },
       { name: 'Контактни повърхности', cleaning: 'Т', washing: '2С', disinfection: '2С' }
     ]},
     { id: '3', name: '3. Склад', areas: [
       { name: 'Под,сифони', cleaning: 'Т', washing: 'Т', disinfection: '2С' },
       { name: 'Стени', cleaning: 'Т', washing: 'С', disinfection: 'ПН' },
-      { name: 'Таван', cleaning: 'С', washing: 'С', disinfection: 'ПН' },
       { name: 'Врати', cleaning: 'Т', washing: 'Т', disinfection: 'ПН' },
       { name: 'Контактни повърхности', cleaning: 'Т', washing: '2С', disinfection: '2С' }
     ]},
     { id: '4', name: '4. Хладилна камера 1 (0° -4° С) - суровина', areas: [
       { name: 'Под', cleaning: 'Т', washing: 'Т', disinfection: '2С' },
       { name: 'Стени', cleaning: 'Т', washing: 'С', disinfection: 'ПН' },
-      { name: 'Таван', cleaning: 'С', washing: 'С', disinfection: 'ПН' },
       { name: 'Врата', cleaning: 'Т', washing: 'Т', disinfection: 'ПН' },
       { name: 'Контактни повърхности и оборудване', cleaning: 'Т', washing: '2С', disinfection: '2С' }
     ]}
   ]);
 
-  const [refrigerators] = useState([
+  const [defaultRefrigerators] = useState([
     { id: '5', name: '5.Хладилник 2 - безалкохолни напитки, айрани', cleaning: 'Т', washing: 'Т', disinfection: 'ПН' },
     { id: '6', name: '6.Хладилник 3 – пица', cleaning: 'Т', washing: 'Т', disinfection: 'ПН' },
     { id: '7', name: '7.Хладилник 4 – дюнер', cleaning: 'Т', washing: 'Т', disinfection: 'ПН' },
@@ -168,6 +161,7 @@ const HygieneWorkCard = ({ template, config, department, restaurantId, onBack })
   ]);
 
   const [zones, setZones] = useState(defaultZones);
+  const [refrigerators, setRefrigerators] = useState(defaultRefrigerators);
   const [customRefrigerators, setCustomRefrigerators] = useState([]);
   const [completionData, setCompletionData] = useState({});
   const [employees, setEmployees] = useState([]);
@@ -207,10 +201,19 @@ const HygieneWorkCard = ({ template, config, department, restaurantId, onBack })
 
   // ─── hasAnyData ───
   const hasAnyData = () => {
-    if (manager.trim() || hygieneType !== 'Т/ 2С / С / ПН / М' || employees.length > 0) return true;
+    if (hygieneType !== 'Т/ 2С / С / ПН / М' || employees.length > 0) return true;
     if (zones.length > defaultZones.length || customRefrigerators.length > 0) return true;
     if (Object.keys(completionData).length > 0) return true;
     return false;
+  };
+
+  // ─── Filter out "Таван" from loaded zones ───
+  const filterTavan = (loadedZones) => {
+    if (!loadedZones) return loadedZones;
+    return loadedZones.map(z => ({
+      ...z,
+      areas: z.areas ? z.areas.filter(a => !a.name.toLowerCase().includes('таван')) : z.areas
+    }));
   };
 
   // ─── Драфт ───
@@ -220,9 +223,10 @@ const HygieneWorkCard = ({ template, config, department, restaurantId, onBack })
     if (saved) {
       setHasDraft(true);
       try {
-        const { hygieneType: ht, manager: m, employees: e, zones: z, customRefrigerators: cr, completionData: cd, timestamp } = JSON.parse(saved);
-        setHygieneType(ht || 'Т/ 2С / С / ПН / М'); setManager(m || '');
-        setEmployees(e || []); setZones(z || defaultZones);
+        const { hygieneType: ht, employees: e, zones: z, refrigerators: r, customRefrigerators: cr, completionData: cd, timestamp } = JSON.parse(saved);
+        setHygieneType(ht || 'Т/ 2С / С / ПН / М');
+        setEmployees(e || []); setZones(filterTavan(z) || defaultZones);
+        if (r) setRefrigerators(r);
         setCustomRefrigerators(cr || []); setCompletionData(cd || {});
         setAutoSaveStatus(`Зареден драфт от ${new Date(timestamp).toLocaleString('bg-BG')}`);
         setTimeout(() => setAutoSaveStatus(''), 5000);
@@ -231,30 +235,30 @@ const HygieneWorkCard = ({ template, config, department, restaurantId, onBack })
   }, [template.id, currentDate]);
 
   const loadSavedConfig = async () => {
-    // Първо опитваме localStorage (бързо, работи offline)
     try {
       const localConfig = localStorage.getItem(`config_${template.id}_${restaurantId}`);
       if (localConfig) {
-        const { zones: savedZones, customRefrigerators: savedCR, employees: savedEmp } = JSON.parse(localConfig);
-        if (savedZones) setZones(savedZones);
+        const { zones: savedZones, refrigerators: savedRef, customRefrigerators: savedCR, employees: savedEmp } = JSON.parse(localConfig);
+        if (savedZones) setZones(filterTavan(savedZones));
+        if (savedRef) setRefrigerators(savedRef);
         if (savedCR) setCustomRefrigerators(savedCR);
         if (savedEmp) setEmployees(savedEmp);
-        return; // Имаме локална конфигурация — не ходим до Supabase
+        return;
       }
     } catch { /* ignore parse errors */ }
 
-    // Fallback: зареждаме от последния submit в Supabase
     try {
       const { data } = await supabase.from('checklist_submissions').select('data')
         .eq('template_id', template.id).eq('restaurant_id', restaurantId)
         .order('created_at', { ascending: false }).limit(1).single();
       if (data?.data) {
         if (data.data.employees) setEmployees(data.data.employees);
-        if (data.data.zones) setZones(data.data.zones);
+        if (data.data.zones) setZones(filterTavan(data.data.zones));
+        if (data.data.refrigerators) setRefrigerators(data.data.refrigerators);
         if (data.data.customRefrigerators) setCustomRefrigerators(data.data.customRefrigerators);
-        // Кешираме локално за следващия път
         localStorage.setItem(`config_${template.id}_${restaurantId}`, JSON.stringify({
-          zones: data.data.zones || defaultZones,
+          zones: filterTavan(data.data.zones) || defaultZones,
+          refrigerators: data.data.refrigerators || defaultRefrigerators,
           customRefrigerators: data.data.customRefrigerators || [],
           employees: data.data.employees || []
         }));
@@ -265,12 +269,12 @@ const HygieneWorkCard = ({ template, config, department, restaurantId, onBack })
   useEffect(() => {
     const interval = setInterval(() => saveDraft(), 30000);
     return () => clearInterval(interval);
-  }, [hygieneType, manager, employees, zones, customRefrigerators, completionData]);
+  }, [hygieneType, employees, zones, refrigerators, customRefrigerators, completionData]);
 
   const saveDraft = () => {
     if (!hasAnyData()) return;
     localStorage.setItem(`draft_${template.id}_${currentDate}`, JSON.stringify({
-      hygieneType, manager, employees, zones, customRefrigerators, completionData, timestamp: Date.now()
+      hygieneType, employees, zones, refrigerators, customRefrigerators, completionData, timestamp: Date.now()
     }));
     setHasDraft(true); setAutoSaveStatus('✓ Автоматично запазено');
     setTimeout(() => setAutoSaveStatus(''), 2000);
@@ -278,10 +282,8 @@ const HygieneWorkCard = ({ template, config, department, restaurantId, onBack })
 
   const clearDraft = () => {
     if (window.confirm('Сигурни ли сте, че искате да изчистите текущия драфт и да започнете нова работна карта?')) {
-      // Нулираме само данните от попълването, НЕ конфигурацията
-      setHygieneType('Т/ 2С / С / ПН / М'); setManager('');
+      setHygieneType('Т/ 2С / С / ПН / М');
       setCompletionData({});
-      // zones, customRefrigerators и employees остават!
       localStorage.removeItem(`draft_${template.id}_${currentDate}`);
       setHasDraft(false); setAutoSaveStatus('Драфтът е изчистен.');
       setTimeout(() => setAutoSaveStatus(''), 3000);
@@ -323,7 +325,14 @@ const HygieneWorkCard = ({ template, config, department, restaurantId, onBack })
   const removeCustomZone = (id) => setZones(zones.filter(z => !defaultZones.find(dz => dz.id === z.id) && z.id !== id));
   const removeCustomRefrigerator = (id) => setCustomRefrigerators(customRefrigerators.filter(r => r.id !== id));
   const updateZoneName = (zId, n) => setZones(zones.map(z => z.id === zId ? { ...z, name: n } : z));
-  const updateRefrigeratorName = (rId, n) => setCustomRefrigerators(customRefrigerators.map(r => r.id === rId ? { ...r, name: n } : r));
+  const updateRefrigeratorName = (rId, n) => {
+    // Check in default refrigerators first
+    if (refrigerators.find(r => r.id === rId)) {
+      setRefrigerators(refrigerators.map(r => r.id === rId ? { ...r, name: n } : r));
+    } else {
+      setCustomRefrigerators(customRefrigerators.map(r => r.id === rId ? { ...r, name: n } : r));
+    }
+  };
 
   // ─── Completion data ───
   const handleCompletionChange = (itemId, areaName, field, value) => {
@@ -336,30 +345,58 @@ const HygieneWorkCard = ({ template, config, department, restaurantId, onBack })
     setCompletionData(prev => ({ ...prev, [`${itemId}_${areaName || 'main'}_executor`]: executor }));
   };
 
+  // ─── Auto-fill row: маркира всички чекбоксове + задава изпълнител ───
+  const autoFillZoneRow = (zoneId, areaName, executor) => {
+    setCompletionData(prev => ({
+      ...prev,
+      [`${zoneId}_${areaName}_cleaning`]: true,
+      [`${zoneId}_${areaName}_washing`]: true,
+      [`${zoneId}_${areaName}_disinfection`]: true,
+      [`${zoneId}_${areaName}_executor`]: executor || prev[`${zoneId}_${areaName}_executor`] || '',
+    }));
+  };
+
+  const autoFillRefRow = (refId, executor) => {
+    setCompletionData(prev => ({
+      ...prev,
+      [`${refId}_main_cleaning`]: true,
+      [`${refId}_main_washing`]: true,
+      [`${refId}_main_disinfection`]: true,
+      [`${refId}_main_executor`]: executor || prev[`${refId}_main_executor`] || '',
+    }));
+  };
+
+  // ─── Auto-fill цяла зона ───
+  const autoFillZone = (zone, executor) => {
+    zone.areas.forEach(area => autoFillZoneRow(zone.id, area.name, executor));
+  };
+
+  // ─── Auto-fill всичко ───
+  const autoFillAll = (executor) => {
+    zones.forEach(zone => autoFillZone(zone, executor));
+    allRefrigerators.forEach(ref => autoFillRefRow(ref.id, executor));
+  };
+
   // ─── Submit с offline ───
   const handleSubmit = async () => {
     if (!hasAnyData()) { alert('Моля попълнете поне едно поле.'); return; }
     setLoading(true);
     const sub = {
       template_id: template.id, restaurant_id: restaurantId, department_id: department.id,
-      data: { currentDate, hygieneType, manager, employees, zones, customRefrigerators, completionData },
+      data: { currentDate, hygieneType, employees, zones, refrigerators, customRefrigerators, completionData },
       submission_date: currentDate, synced: true,
     };
     try { const { data: u } = await supabase.auth.getUser(); if (u?.user?.id) sub.submitted_by = u.user.id; } catch {}
 
-    // Запазваме конфигурацията в localStorage за бързо зареждане
     const saveConfigLocally = () => {
       localStorage.setItem(`config_${template.id}_${restaurantId}`, JSON.stringify({
-        zones, customRefrigerators, employees
+        zones, refrigerators, customRefrigerators, employees
       }));
     };
 
     const resetForm = () => {
-      // НЕ нулираме zones, customRefrigerators и employees — те са конфигурация!
       setHygieneType('Т/ 2С / С / ПН / М');
-      setManager('');
       setCompletionData({});
-      // Запазваме конфигурацията локално
       saveConfigLocally();
     };
 
@@ -412,7 +449,37 @@ const HygieneWorkCard = ({ template, config, department, restaurantId, onBack })
     </td>
   );
 
+  /* Auto-fill button for a single row */
+  const autoFillBtn = (onClick, tooltip) => (
+    <button onClick={onClick} title={tooltip || 'Попълни всички'}
+      style={{
+        background: 'none', border: `1.5px solid ${DS.color.borderLight}`, borderRadius: DS.radius,
+        cursor: 'pointer', padding: '4px 6px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: DS.color.primaryLight, transition: 'all 150ms ease',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.backgroundColor = DS.color.okBg; e.currentTarget.style.borderColor = DS.color.primary; }}
+      onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = DS.color.borderLight; }}
+    >
+      <CheckCheck style={{ width: 16, height: 16 }} />
+    </button>
+  );
+
   const pad = isMobile ? '12px' : '24px';
+
+  // Check if all rows in a zone are completed
+  const isZoneFullyCompleted = (zone) => {
+    return zone.areas.every(area =>
+      isCompleted(zone.id, area.name, 'cleaning') &&
+      isCompleted(zone.id, area.name, 'washing') &&
+      isCompleted(zone.id, area.name, 'disinfection')
+    );
+  };
+
+  const isRefCompleted = (ref) => {
+    return isCompleted(ref.id, null, 'cleaning') &&
+      isCompleted(ref.id, null, 'washing') &&
+      isCompleted(ref.id, null, 'disinfection');
+  };
 
   return (
     <>
@@ -484,7 +551,7 @@ const HygieneWorkCard = ({ template, config, department, restaurantId, onBack })
             </div>
           </div>
 
-          {/* Controls: Дата + Вид + Управител */}
+          {/* Controls: Дата + Вид (без Управител) */}
           <div style={{ backgroundColor: DS.color.surface, borderRadius: DS.radius, padding: pad, marginBottom: '16px', boxShadow: DS.shadow.sm, border: `1px solid ${DS.color.borderLight}`, display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '16px', alignItems: isMobile ? 'stretch' : 'flex-end', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ padding: '6px', borderRadius: DS.radius, backgroundColor: DS.color.okBg, flexShrink: 0 }}><Calendar style={{ width: 14, height: 14, color: DS.color.primary }} /></div>
@@ -493,10 +560,6 @@ const HygieneWorkCard = ({ template, config, department, restaurantId, onBack })
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
               <div style={{ padding: '6px', borderRadius: DS.radius, backgroundColor: DS.color.okBg, flexShrink: 0 }}><ClipboardCheck style={{ width: 14, height: 14, color: DS.color.primary }} /></div>
               <ControlInput label="Вид хигиенизиране" value={hygieneType} onChange={e => setHygieneType(e.target.value)} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
-              <div style={{ padding: '6px', borderRadius: DS.radius, backgroundColor: DS.color.okBg, flexShrink: 0 }}><Building2 style={{ width: 14, height: 14, color: DS.color.primary }} /></div>
-              <ControlInput label="Управител" value={manager} onChange={e => setManager(e.target.value)} placeholder="Име и фамилия" />
             </div>
             {hasDraft && (
               <button onClick={clearDraft} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px 14px', backgroundColor: 'transparent', border: `1.5px solid ${DS.color.danger}`, borderRadius: DS.radius, color: DS.color.danger, cursor: 'pointer', fontFamily: DS.font, fontSize: '12px', fontWeight: 600, minHeight: '40px', whiteSpace: 'nowrap' }}>
@@ -546,6 +609,31 @@ const HygieneWorkCard = ({ template, config, department, restaurantId, onBack })
             </div>
           </div>
 
+          {/* ═══════ AUTO-FILL ALL BUTTON ═══════ */}
+          {employees.length > 0 && (
+            <div style={{ backgroundColor: DS.color.surface, borderRadius: DS.radius, padding: isMobile ? '12px' : '16px 24px', marginBottom: '16px', boxShadow: DS.shadow.sm, border: `1px solid ${DS.color.borderLight}`, display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CheckCheck style={{ width: 18, height: 18, color: DS.color.primary }} />
+                <span style={{ fontFamily: DS.font, fontSize: '13px', fontWeight: 700, color: DS.color.primary, textTransform: 'uppercase' }}>Бързо попълване</span>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', flex: 1 }}>
+                {employees.map(emp => (
+                  <button key={emp.id} onClick={() => autoFillAll(emp.name)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '6px',
+                      padding: '8px 14px', backgroundColor: DS.color.okBg,
+                      border: `1.5px solid ${DS.color.primary}`, borderRadius: DS.radius,
+                      color: DS.color.primary, cursor: 'pointer', fontFamily: DS.font,
+                      fontSize: '12px', fontWeight: 600, minHeight: '36px',
+                    }}>
+                    <CheckCheck style={{ width: 14, height: 14 }} />
+                    Всичко → {emp.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* ═══════ MAIN TABLE ═══════ */}
           <div style={{ backgroundColor: DS.color.surface, borderRadius: DS.radius, boxShadow: DS.shadow.md, overflow: 'hidden', marginBottom: '16px', border: `1px solid ${DS.color.borderLight}` }}>
             <div style={{ overflowX: 'auto' }}>
@@ -556,7 +644,8 @@ const HygieneWorkCard = ({ template, config, department, restaurantId, onBack })
                     <th style={{ ...thStyle, textAlign: 'center', minWidth: '130px' }}>Почистване</th>
                     <th style={{ ...thStyle, textAlign: 'center', minWidth: '130px' }}>Измиване</th>
                     <th style={{ ...thStyle, textAlign: 'center', minWidth: '130px' }}>Дезинфекция</th>
-                    <th style={{ ...thStyle, textAlign: 'center', minWidth: '160px', borderRight: 'none' }}>Извършил</th>
+                    <th style={{ ...thStyle, textAlign: 'center', minWidth: '160px' }}>Извършил</th>
+                    <th style={{ ...thStyle, textAlign: 'center', minWidth: '50px', borderRight: 'none' }}>✓</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -575,6 +664,22 @@ const HygieneWorkCard = ({ template, config, department, restaurantId, onBack })
                             )}
                           </div>
                         </td>
+                        {/* Auto-fill zone button */}
+                        <td style={{ padding: '12px 8px', borderBottom: `1px solid ${DS.color.borderLight}`, textAlign: 'center' }}>
+                          {employees.length > 0 && (
+                            <button onClick={() => autoFillZone(zone, employees[0]?.name || '')}
+                              title={`Попълни цялата зона (${employees[0]?.name || ''})`}
+                              style={{
+                                background: isZoneFullyCompleted(zone) ? DS.color.okBg : 'none',
+                                border: `1.5px solid ${isZoneFullyCompleted(zone) ? DS.color.ok : DS.color.borderLight}`,
+                                borderRadius: DS.radius, cursor: 'pointer', padding: '6px 8px',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: isZoneFullyCompleted(zone) ? DS.color.ok : DS.color.primaryLight,
+                              }}>
+                              <CheckCheck style={{ width: 16, height: 16 }} />
+                            </button>
+                          )}
+                        </td>
                       </tr>
                       {/* Zone areas */}
                       {zone.areas.map((area, ai) => (
@@ -583,7 +688,13 @@ const HygieneWorkCard = ({ template, config, department, restaurantId, onBack })
                           {completionCell(zone.id, area.name, 'cleaning', area.cleaning)}
                           {completionCell(zone.id, area.name, 'washing', area.washing)}
                           {completionCell(zone.id, area.name, 'disinfection', area.disinfection)}
-                          <td style={{ ...cellCenter, borderRight: 'none' }}>{executorSelect(zone.id, area.name)}</td>
+                          <td style={cellCenter}>{executorSelect(zone.id, area.name)}</td>
+                          <td style={{ ...cellCenter, borderRight: 'none' }}>
+                            {employees.length > 0 && autoFillBtn(
+                              () => autoFillZoneRow(zone.id, area.name, getExecutor(zone.id, area.name) || employees[0]?.name || ''),
+                              'Попълни ред'
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </React.Fragment>
@@ -595,9 +706,8 @@ const HygieneWorkCard = ({ template, config, department, restaurantId, onBack })
                       <td style={tdStyle}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <input type="text" value={ref.name}
-                            onChange={e => customRefrigerators.find(cr => cr.id === ref.id) && updateRefrigeratorName(ref.id, e.target.value)}
-                            readOnly={!customRefrigerators.find(cr => cr.id === ref.id)}
-                            style={{ flex: 1, padding: '6px 10px', borderRadius: DS.radius, fontFamily: DS.font, fontSize: '14px', fontWeight: 500, color: DS.color.primary, border: customRefrigerators.find(cr => cr.id === ref.id) ? `1.5px solid ${DS.color.borderLight}` : 'none', backgroundColor: customRefrigerators.find(cr => cr.id === ref.id) ? DS.color.surface : 'transparent', outline: 'none' }} />
+                            onChange={e => updateRefrigeratorName(ref.id, e.target.value)}
+                            style={{ flex: 1, padding: '6px 10px', borderRadius: DS.radius, fontFamily: DS.font, fontSize: '14px', fontWeight: 500, color: DS.color.primary, border: `1.5px solid ${DS.color.borderLight}`, backgroundColor: DS.color.surface, outline: 'none' }} />
                           {customRefrigerators.find(cr => cr.id === ref.id) && (
                             <button onClick={() => removeCustomRefrigerator(ref.id)} style={{ background: 'none', border: 'none', color: DS.color.danger, cursor: 'pointer', padding: '4px', display: 'flex' }}>
                               <Trash2 style={{ width: 14, height: 14 }} />
@@ -608,7 +718,13 @@ const HygieneWorkCard = ({ template, config, department, restaurantId, onBack })
                       {completionCell(ref.id, null, 'cleaning', ref.cleaning)}
                       {completionCell(ref.id, null, 'washing', ref.washing)}
                       {completionCell(ref.id, null, 'disinfection', ref.disinfection)}
-                      <td style={{ ...cellCenter, borderRight: 'none' }}>{executorSelect(ref.id, null)}</td>
+                      <td style={cellCenter}>{executorSelect(ref.id, null)}</td>
+                      <td style={{ ...cellCenter, borderRight: 'none' }}>
+                        {employees.length > 0 && autoFillBtn(
+                          () => autoFillRefRow(ref.id, getExecutor(ref.id, null) || employees[0]?.name || ''),
+                          'Попълни ред'
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

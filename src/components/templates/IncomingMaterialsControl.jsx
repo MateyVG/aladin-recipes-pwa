@@ -81,6 +81,7 @@ const Icon = ({ name, size = 16, color = 'currentColor', style: st }) => {
     calendar: <><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></>,
     rotateCcw: <><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></>,
     download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></>,
+    fileText: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={st}>
@@ -210,7 +211,7 @@ const IncomingMaterialsControl = ({ profile: propProfile, user: propUser, onBack
   // Current Material Form
   const [currentMaterial, setCurrentMaterial] = useState({
     materialName: '', temperature: '', transportType: '',
-    quantity: '', batchNumber: '',
+    quantity: '', batchNumber: '', documentNumber: '',
     receiptDate: new Date().toISOString().split('T')[0],
     expiryDate: '', notes: '',
   });
@@ -237,7 +238,6 @@ const IncomingMaterialsControl = ({ profile: propProfile, user: propUser, onBack
     for (const item of queue) {
       try {
         const { _savedAt, ...payload } = item;
-        // Insert control record
         const { data: rec, error: e1 } = await supabase.from('incoming_control_records').insert({
           restaurant_id: payload.restaurant_id, control_date: payload.control_date,
           company_name: payload.company_name, object_name: payload.object_name,
@@ -245,7 +245,6 @@ const IncomingMaterialsControl = ({ profile: propProfile, user: propUser, onBack
           finalized_at: payload.finalized_at, finalized_by: payload.finalized_by, created_by: payload.created_by,
         }).select().single();
         if (e1) throw e1;
-        // Insert materials
         const mats = payload.materials.map(m => ({ ...m, control_record_id: rec.id }));
         const { error: e2 } = await supabase.from('incoming_control_materials').insert(mats);
         if (e2) throw e2;
@@ -313,7 +312,6 @@ const IncomingMaterialsControl = ({ profile: propProfile, user: propUser, onBack
   const handleSupplierChange = (supplierId, supplierList) => {
     if (supplierId === 'new') { setShowNewSupplierModal(true); return; }
     if (!supplierId) { setSelectedSupplier(null); setSupplierMaterials([]); return; }
-    // Allow passing fresh supplier list (for use right after loadSuppliers)
     const list = supplierList || suppliers;
     const sup = list.find(s => s.id === supplierId);
     if (!sup) { console.warn('Supplier not found:', supplierId); return; }
@@ -347,7 +345,7 @@ const IncomingMaterialsControl = ({ profile: propProfile, user: propUser, onBack
   const resetMaterialForm = () => {
     setCurrentMaterial({
       materialName: '', temperature: '', transportType: '',
-      quantity: '', batchNumber: '',
+      quantity: '', batchNumber: '', documentNumber: '',
       receiptDate: new Date().toISOString().split('T')[0],
       expiryDate: '', notes: '',
     });
@@ -384,7 +382,6 @@ const IncomingMaterialsControl = ({ profile: propProfile, user: propUser, onBack
       setShowNewSupplierModal(false);
       const savedName = newSupplier.name;
       setNewSupplier({ name: '', contactInfo: '', materials: [] });
-      // Use fresh list to find and select the new supplier
       handleSupplierChange(sup.id, freshList);
       setAutoSaveStatus(`✓ Доставчик "${savedName}" създаден`);
       setTimeout(() => setAutoSaveStatus(''), 3000);
@@ -405,7 +402,8 @@ const IncomingMaterialsControl = ({ profile: propProfile, user: propUser, onBack
     const materialsPayload = materials.map(m => ({
       supplier_id: m.supplierId, supplier_name: m.supplierName,
       material_name: m.materialName, quantity: m.quantity,
-      batch_number: m.batchNumber, temperature: m.temperature || null,
+      batch_number: m.batchNumber, document_number: m.documentNumber || null,
+      temperature: m.temperature || null,
       transport_type: m.transportType || null,
       receipt_date: m.receiptDate || null, expiry_date: m.expiryDate || null,
       status: 'accepted', notes: m.notes || null, created_by: user?.id,
@@ -516,7 +514,7 @@ const IncomingMaterialsControl = ({ profile: propProfile, user: propUser, onBack
             </div>
           )}
           <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 600 }}>
-            {now.toLocaleString('bg-BG', { hour: '2-digit', minute: '2-digit', ...(isMobile ? {} : { day: '2-digit', month: '2-digit' }), hour12: false })}
+            {now.toLocaleDateString('bg-BG', { day: '2-digit', month: '2-digit', year: 'numeric' })}
           </span>
         </div>
       </div>
@@ -662,7 +660,7 @@ const IncomingMaterialsControl = ({ profile: propProfile, user: propUser, onBack
                   padding: '10px 14px', backgroundColor: DS.color.blueBg, border: `1px solid ${DS.color.blue}20`,
                   borderRadius: DS.radius, fontFamily: DS.font, fontSize: '12px', color: DS.color.blue,
                 }}>
-                  <strong>Попълни само:</strong> количество и партида. Останалото е автоматично.
+                  <strong>Попълни само:</strong> количество, партида и документ. Останалото е автоматично.
                 </div>
 
                 <div style={{ display: 'flex', gap: '12px', flexDirection: isMobile ? 'column' : 'row' }}>
@@ -670,6 +668,26 @@ const IncomingMaterialsControl = ({ profile: propProfile, user: propUser, onBack
                     onChange={e => setCurrentMaterial(p => ({ ...p, quantity: e.target.value }))} />
                   <ControlInput label="4. Партиден №" value={currentMaterial.batchNumber} placeholder="напр. L-2026-045"
                     onChange={e => setCurrentMaterial(p => ({ ...p, batchNumber: e.target.value }))} />
+                </div>
+
+                {/* ─── Придружаващ документ ─── */}
+                <div style={{
+                  padding: '12px', backgroundColor: DS.color.surfaceAlt,
+                  border: `1px solid ${DS.color.borderLight}`, borderRadius: DS.radius,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                    <Icon name="fileText" size={14} color={DS.color.graphiteLight} />
+                    <label style={{ fontFamily: DS.font, fontSize: '11px', fontWeight: 600, color: DS.color.graphiteLight, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      5. Придружаващ документ
+                    </label>
+                  </div>
+                  <input type="text" value={currentMaterial.documentNumber}
+                    onChange={e => setCurrentMaterial(p => ({ ...p, documentNumber: e.target.value }))}
+                    placeholder="Номер на фактура, CMR, ветеринарно свидетелство..."
+                    style={{ ...inputBase(false) }} />
+                  <div style={{ marginTop: '4px', fontFamily: DS.font, fontSize: '10px', color: DS.color.graphiteMuted }}>
+                    Фактура, CMR, ветеринарно свидетелство, сертификат за качество и др.
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: '12px', flexDirection: isMobile ? 'column' : 'row' }}>
@@ -738,6 +756,11 @@ const IncomingMaterialsControl = ({ profile: propProfile, user: propUser, onBack
                   <div style={{ fontFamily: DS.font, fontSize: '12px', color: DS.color.graphiteMed, display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                     <span style={{ padding: '1px 6px', backgroundColor: DS.color.bgWarm, borderRadius: '4px' }}>{m.supplierName}</span>
                     <span>Партида: {m.batchNumber}</span>
+                    {m.documentNumber && (
+                      <span style={{ padding: '1px 6px', backgroundColor: '#FEF3C7', borderRadius: '4px', color: '#92400E', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <Icon name="fileText" size={10} color="#92400E" /> {m.documentNumber}
+                      </span>
+                    )}
                     {m.temperature && <span style={{ padding: '1px 6px', backgroundColor: DS.color.blueBg, borderRadius: '4px', color: DS.color.blue }}>{m.temperature}°C</span>}
                     {m.transportType && <span>{m.transportType}</span>}
                     {m.receiptDate && <span>Пол.: {new Date(m.receiptDate).toLocaleDateString('bg-BG')}</span>}
@@ -823,7 +846,6 @@ const IncomingMaterialsControl = ({ profile: propProfile, user: propUser, onBack
             borderRadius: '16px 16px 0 0', overflow: 'hidden', boxShadow: '0 -8px 40px rgba(0,0,0,0.15)',
             maxHeight: '85vh', overflowY: 'auto',
           }}>
-            {/* Header */}
             <div style={{ backgroundColor: DS.color.primary, padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontFamily: DS.font, fontSize: '16px', fontWeight: 700, color: 'white' }}>Нов доставчик</span>
               <button onClick={() => setShowNewSupplierModal(false)} style={{
@@ -886,7 +908,6 @@ const IncomingMaterialsControl = ({ profile: propProfile, user: propUser, onBack
               </div>
             </div>
 
-            {/* Footer */}
             <div style={{
               padding: '16px 20px', borderTop: `1px solid ${DS.color.borderLight}`,
               display: 'flex', gap: '8px', justifyContent: 'flex-end',
