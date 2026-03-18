@@ -14,6 +14,7 @@ import OilChangeChecklist from './templates/OilChangeChecklist'
 import IncomingMaterialsControl from './templates/IncomingMaterialsControl.jsx'
 import TransportHygieneChecklist from './templates/TransportHygieneChecklist'
 import ThermalProcessingSheet from './templates/ThermalProcessingSheet'
+import HealthBookRegistry from './templates/HealthBookRegistry'
 import { useNavigationHistory } from '../hooks/useNavigationHistory'
 
 const TEMPLATE_COMPONENTS = {
@@ -29,6 +30,7 @@ const TEMPLATE_COMPONENTS = {
   'IncomingMaterialsControl': IncomingMaterialsControl,
   'TransportHygieneChecklist': TransportHygieneChecklist,
   'ThermalProcessingSheet': ThermalProcessingSheet,
+  'HealthBookRegistry': HealthBookRegistry,
 }
 
 /* ═══════════════════════════════════════════════════════════════

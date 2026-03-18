@@ -5,9 +5,6 @@ import {
   CheckCircle, RotateCcw, FileText, AlertCircle, ChevronLeft
 } from 'lucide-react';
 
-/* ═══════════════════════════════════════════════════════════════
-   DESIGN TOKENS — идентични с ChickenMeatballProductionSheet
-   ═══════════════════════════════════════════════════════════════ */
 const DS = {
   color: {
     bg: '#ECEEED', bgWarm: '#F4F6F5', surface: '#FFFFFF', surfaceAlt: '#F7F9F8',
@@ -45,9 +42,6 @@ const GLOBAL_CSS = `
   ::-webkit-scrollbar-thumb { background: ${DS.color.sage}; border-radius: 0; }
 `;
 
-/* ═══════════════════════════════════════════════════════════════
-   RESPONSIVE HOOK
-   ═══════════════════════════════════════════════════════════════ */
 const useResponsive = () => {
   const [screen, setScreen] = useState({ w: window.innerWidth, h: window.innerHeight });
   useEffect(() => {
@@ -67,9 +61,6 @@ const useResponsive = () => {
   };
 };
 
-/* ═══════════════════════════════════════════════════════════════
-   INPUT HELPERS
-   ═══════════════════════════════════════════════════════════════ */
 const inputBase = (focused) => ({
   width: '100%', padding: '10px 12px',
   backgroundColor: focused ? DS.color.surface : DS.color.surfaceAlt,
@@ -104,10 +95,6 @@ const ControlInput = ({ label, type = 'text', value, onChange, placeholder, styl
   );
 };
 
-/* ═══════════════════════════════════════════════════════════════
-   TIME 24H SELECT — Dropdown ЧЧ:ММ без AM/PM
-   ═══════════════════════════════════════════════════════════════ */
-/* ═══ CLOCK FACE TIME PICKER ═══ */
 const ClockFacePicker = ({ value, onChange, label: cfLabel, style: cfStyle }) => {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState('hour');
@@ -257,15 +244,10 @@ const ClockFacePicker = ({ value, onChange, label: cfLabel, style: cfStyle }) =>
   );
 };
 
-/* ═══ Time24Select wrapper using ClockFacePicker ═══ */
 const Time24Select = ({ label, value, onChange }) => {
   return <ClockFacePicker value={value} onChange={onChange} label={label} />;
 };
 
-/* ═══════════════════════════════════════════════════════════════
-   PRODUCT ROW CARD — Един ред от таблицата като карта
-   Различни полета спрямо type (file/bonFile/wings/rice)
-   ═══════════════════════════════════════════════════════════════ */
 const ProductRowCard = ({ type, production, onUpdate, onRemove, canRemove, savedEmployees, isMobile, isLandscape }) => {
   const [hovered, setHovered] = useState(false);
   const isFile = type === 'file';
@@ -298,7 +280,7 @@ const ProductRowCard = ({ type, production, onUpdate, onRemove, canRemove, saved
           № {production.number}
         </span>
 
-        {/* Показваме fry info ако не е ориз */}
+        {/* Показваме fry info само за типовете с пържене (не ориз) */}
         {!isRice && (
           <div style={{ display: 'flex', gap: '12px' }}>
             <span style={{
@@ -361,14 +343,14 @@ const ProductRowCard = ({ type, production, onUpdate, onRemove, canRemove, saved
           placeholder="Партида"
         />
 
-        {/* Час на приготвяне — 24h dropdown */}
+        {/* Час на приготвяне */}
         <Time24Select
           label="Час на приготвяне"
           value={production.cookingTime}
           onChange={val => onUpdate(type, production.id, 'cookingTime', val)}
         />
 
-        {/* Час на срок на витрината — 24h dropdown */}
+        {/* Час на срок на витрината */}
         <Time24Select
           label="Час на срок на витрината"
           value={production.displayTime}
@@ -442,12 +424,8 @@ const ProductRowCard = ({ type, production, onUpdate, onRemove, canRemove, saved
   );
 };
 
-/* ═══════════════════════════════════════════════════════════════
-   PRODUCT SECTION — Една секция (Филе / Бон филе / Крилца / Ориз)
-   ═══════════════════════════════════════════════════════════════ */
 const ProductSection = ({ type, title, emoji, productionsList, onAdd, onRemove, onUpdate, savedEmployees, isMobile, isTablet, isLandscape }) => (
   <div style={{ marginBottom: isMobile ? '20px' : '28px' }}>
-    {/* Section header */}
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       marginBottom: '12px',
@@ -476,7 +454,6 @@ const ProductSection = ({ type, title, emoji, productionsList, onAdd, onRemove, 
       </button>
     </div>
 
-    {/* Cards grid */}
     <div style={{
       display: 'grid',
       gridTemplateColumns:
@@ -504,33 +481,36 @@ const ProductSection = ({ type, title, emoji, productionsList, onAdd, onRemove, 
 );
 
 /* ═══════════════════════════════════════════════════════════════
-   НАЧАЛНИ СТОЙНОСТИ — за reset на формата
+   НАЧАЛНИ СТОЙНОСТИ
+   Температури: 340°F = 171°C | 345°F = 174°C
    ═══════════════════════════════════════════════════════════════ */
 const makeInitialProductions = (baseId) => ({
   file: [{
     id: baseId, number: 1, count: '', batchL: '',
-    fryDuration: '4,5 мин', fryTemperature: '340°F',
+    fryDuration: '4,5 мин', fryTemperature: '171°C',
     cookingTime: '', displayTime: '', defect: '', employeeName: '', checked: false
   }],
   bonFile: [{
     id: baseId + 1, number: 1, quantity: '', batchL: '',
-    fryDuration: '2,5 мин', fryTemperature: '340°F',
+    fryDuration: '2,5 мин', fryTemperature: '171°C',
     cookingTime: '', displayTime: '', defect: '', employeeName: '', checked: false
   }],
   wings: [{
     id: baseId + 2, number: 1, quantity: '', batchL: '',
-    fryDuration: '11,5 мин', fryTemperature: '345°F',
+    fryDuration: '11,5 мин', fryTemperature: '174°C',
     cookingTime: '', displayTime: '', defect: '', employeeName: '', checked: false
   }],
   rice: [{
     id: baseId + 3, number: 1, quantity: '', batchL: '',
     cookingTime: '', displayTime: '', defect: '', employeeName: '', checked: false
   }],
+  butchetta: [{
+    id: baseId + 4, number: 1, quantity: '', batchL: '',
+    fryDuration: '11,5 мин', fryTemperature: '174°C',
+    cookingTime: '', displayTime: '', defect: '', employeeName: '', checked: false
+  }],
 });
 
-/* ═══════════════════════════════════════════════════════════════
-   MAIN COMPONENT — Логиката е 1:1 от оригинала
-   ═══════════════════════════════════════════════════════════════ */
 const ChickenProductionSheet = ({ template, config, department, restaurantId, onBack }) => {
   const { isMobile, isTablet, isDesktop, isLandscape } = useResponsive();
 
@@ -548,13 +528,11 @@ const ChickenProductionSheet = ({ template, config, department, restaurantId, on
 
   const [productions, setProductions] = useState(makeInitialProductions(1));
 
-  // ─── Live clock ───
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
 
-  // ─── Offline sync queue ───
   const PENDING_KEY = `pending_submissions_${template.id}`;
   const getPending = () => { try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); } catch { return []; } };
   const savePending = (q) => { localStorage.setItem(PENDING_KEY, JSON.stringify(q)); setPendingCount(q.length); };
@@ -593,7 +571,6 @@ const ChickenProductionSheet = ({ template, config, department, restaurantId, on
     return () => { window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline); };
   }, []);
 
-  // ─── Проверка дали има данни (оригинална логика) ───
   const hasAnyData = () => {
     if (manager.trim()) return true;
     return Object.values(productions).some(typeArray =>
@@ -604,7 +581,6 @@ const ChickenProductionSheet = ({ template, config, department, restaurantId, on
     );
   };
 
-  // ─── Драфт система (оригинална логика) ───
   useEffect(() => {
     const draftKey = `draft_${template.id}_${currentDate}`;
     const savedDraft = localStorage.getItem(draftKey);
@@ -612,7 +588,8 @@ const ChickenProductionSheet = ({ template, config, department, restaurantId, on
       setHasDraft(true);
       try {
         const { productions: dp, manager: dm, savedEmployees: de, timestamp } = JSON.parse(savedDraft);
-        setProductions(dp);
+        const initial = makeInitialProductions(Date.now());
+        setProductions({ ...initial, ...dp });
         setManager(dm || '');
         setSavedEmployees(de || []);
         setAutoSaveStatus(`Зареден драфт от ${new Date(timestamp).toLocaleString('bg-BG')}`);
@@ -667,7 +644,6 @@ const ChickenProductionSheet = ({ template, config, department, restaurantId, on
     setShowExitConfirm(false);
   };
 
-  // ─── CRUD за productions (оригинална логика) ───
   const addProduction = (type) => {
     const currentLength = productions[type].length;
     const newProduction = {
@@ -676,13 +652,12 @@ const ChickenProductionSheet = ({ template, config, department, restaurantId, on
       count: type === 'file' ? '' : undefined,
       quantity: type !== 'file' ? '' : undefined,
       batchL: '',
-      fryDuration: type === 'file' ? '4,5 мин' : type === 'bonFile' ? '2,5 мин' : type === 'wings' ? '11,5 мин' : undefined,
-      fryTemperature: type === 'wings' ? '345°F' : type === 'rice' ? undefined : '340°F',
+      fryDuration: type === 'file' ? '4,5 мин' : type === 'bonFile' ? '2,5 мин' : (type === 'wings' || type === 'butchetta') ? '11,5 мин' : undefined,
+      fryTemperature: (type === 'wings' || type === 'butchetta') ? '174°C' : type === 'rice' ? undefined : '171°C',
       cookingTime: '', displayTime: '', defect: '', employeeName: '', checked: false
     };
     setProductions(prev => {
       const updated = [newProduction, ...prev[type]];
-      // Преномерираме — най-новият е с най-висок номер
       const renumbered = updated.map((p, i) => ({ ...p, number: updated.length - i }));
       return { ...prev, [type]: renumbered };
     });
@@ -706,7 +681,6 @@ const ChickenProductionSheet = ({ template, config, department, restaurantId, on
     }
   };
 
-  // ─── Submit с offline поддръжка ───
   const handleSubmit = async () => {
     if (!hasAnyData()) { alert('Моля попълнете поне едно поле.'); return; }
     setLoading(true);
@@ -765,7 +739,7 @@ const ChickenProductionSheet = ({ template, config, department, restaurantId, on
         display: 'flex', flexDirection: 'column',
       }}>
 
-        {/* ═══════ EXIT MODAL ═══════ */}
+        {/* EXIT MODAL */}
         {showExitConfirm && (
           <div style={{
             position: 'fixed', inset: 0, backgroundColor: 'rgba(30,42,38,0.5)',
@@ -803,7 +777,7 @@ const ChickenProductionSheet = ({ template, config, department, restaurantId, on
           </div>
         )}
 
-        {/* ═══════ TOP BAR ═══════ */}
+        {/* TOP BAR */}
         <div style={{
           backgroundColor: DS.color.graphite,
           padding: isMobile ? '8px 12px' : '10px 24px',
@@ -826,7 +800,6 @@ const ChickenProductionSheet = ({ template, config, department, restaurantId, on
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '16px' }}>
-            {/* Online/Offline */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: '6px',
               backgroundColor: isOnline ? 'rgba(27,138,80,0.15)' : 'rgba(197,48,48,0.2)',
@@ -890,7 +863,7 @@ const ChickenProductionSheet = ({ template, config, department, restaurantId, on
           </div>
         </div>
 
-        {/* ═══════ MAIN ═══════ */}
+        {/* MAIN */}
         <div style={{ maxWidth: '1400px', margin: '0 auto', padding: isMobile ? '12px' : '24px', flex: 1, width: '100%' }}>
 
           {/* Header */}
@@ -912,7 +885,7 @@ const ChickenProductionSheet = ({ template, config, department, restaurantId, on
             </div>
           </div>
 
-          {/* Control Bar — Дата + Управител */}
+          {/* Control Bar */}
           <div style={{
             backgroundColor: DS.color.surface, borderRadius: DS.radius,
             padding: pad, marginBottom: isMobile ? '16px' : '24px',
@@ -953,24 +926,34 @@ const ChickenProductionSheet = ({ template, config, department, restaurantId, on
             </div>
           </div>
 
-          {/* ═══════ 4-те секции — оригинална логика ═══════ */}
+          {/* ═══ 5 секции ═══ */}
           <ProductSection type="file" title="Филе"
+          
             productionsList={productions.file}
             onAdd={addProduction} onRemove={removeProduction} onUpdate={updateProduction}
             savedEmployees={savedEmployees} isMobile={isMobile} isTablet={isTablet} isLandscape={isLandscape}
           />
           <ProductSection type="bonFile" title="Бон филе"
+          
             productionsList={productions.bonFile}
             onAdd={addProduction} onRemove={removeProduction} onUpdate={updateProduction}
             savedEmployees={savedEmployees} isMobile={isMobile} isTablet={isTablet} isLandscape={isLandscape}
           />
           <ProductSection type="wings" title="Крилца"
+            
             productionsList={productions.wings}
             onAdd={addProduction} onRemove={removeProduction} onUpdate={updateProduction}
             savedEmployees={savedEmployees} isMobile={isMobile} isTablet={isTablet} isLandscape={isLandscape}
           />
           <ProductSection type="rice" title="Ориз"
+          
             productionsList={productions.rice}
+            onAdd={addProduction} onRemove={removeProduction} onUpdate={updateProduction}
+            savedEmployees={savedEmployees} isMobile={isMobile} isTablet={isTablet} isLandscape={isLandscape}
+          />
+          <ProductSection type="butchetta" title="Бутчета"
+            
+            productionsList={productions.butchetta}
             onAdd={addProduction} onRemove={removeProduction} onUpdate={updateProduction}
             savedEmployees={savedEmployees} isMobile={isMobile} isTablet={isTablet} isLandscape={isLandscape}
           />

@@ -118,6 +118,14 @@ const emptyRecord = () => ({
   inspector: '',
 });
 
+const emptyBagRecord = () => ({
+  id: Date.now() + Math.random(),
+  bagName: '',
+  hygieneStatus: '',
+  correctiveActions: '',
+  inspector: '',
+});
+
 /* ═══════════════════════════════════════════════════════════════
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════ */
@@ -125,6 +133,7 @@ const TransportHygieneChecklist = ({ onBack, user, restaurantId, restaurantName 
   const mob = useR();
   const pad = mob ? '12px' : '20px';
   const [records, setRecords] = useState([emptyRecord()]);
+  const [thermalBags, setThermalBags] = useState([emptyBagRecord()]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [hoverBack, setHoverBack] = useState(false);
@@ -150,6 +159,14 @@ const TransportHygieneChecklist = ({ onBack, user, restaurantId, restaurantName 
     return s ? { color: s.color, backgroundColor: s.bg } : { color: DS.color.graphiteMuted, backgroundColor: DS.color.surfaceAlt };
   };
 
+  /* ═══ THERMAL BAGS CRUD ═══ */
+  const updateBag = (idx, field, value) => {
+    setThermalBags(prev => prev.map((b, i) => i === idx ? { ...b, [field]: value } : b));
+    setSaved(false);
+  };
+  const addBag = () => setThermalBags(prev => [...prev, emptyBagRecord()]);
+  const removeBag = (idx) => { if (thermalBags.length <= 1) return; setThermalBags(prev => prev.filter((_, i) => i !== idx)); };
+
   /* ═══ SAVE TO SUPABASE ═══ */
   const handleSave = async () => {
     setSaving(true);
@@ -171,6 +188,12 @@ const TransportHygieneChecklist = ({ onBack, user, restaurantId, restaurantName 
             hygieneStatus: r.hygieneStatus,
             correctiveActions: r.correctiveActions,
             inspector: r.inspector,
+          })),
+          thermalBags: thermalBags.map(b => ({
+            bagName: b.bagName,
+            hygieneStatus: b.hygieneStatus,
+            correctiveActions: b.correctiveActions,
+            inspector: b.inspector,
           })),
         },
         status: 'completed',
@@ -214,12 +237,23 @@ const TransportHygieneChecklist = ({ onBack, user, restaurantId, restaurantName 
       </tr>
     `).join('');
 
+    const bagRows = thermalBags.map((b, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${b.bagName || '-'}</td>
+        <td>${b.hygieneStatus || '-'}</td>
+        <td>${b.correctiveActions || '-'}</td>
+        <td>${b.inspector || '-'}</td>
+      </tr>
+    `).join('');
+
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>ЧЕК ЛИСТ ХИГИЕНА НА ТРАНСПОРТНИТЕ СРЕДСТВА</title>
     <style>
       body{font-family:'DM Sans',Arial,sans-serif;padding:20px;color:#1E2A26}
       h1{color:#1B5E37;font-size:16px;text-align:center;margin:10px 0}
+      h2{color:#1B5E37;font-size:14px;margin:18px 0 8px}
       .meta{display:flex;justify-content:space-between;font-size:11px;color:#6B7D76;margin-bottom:12px}
-      table{width:100%;border-collapse:collapse;font-size:12px}
+      table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px}
       th{background:#E8F5EE;color:#1B5E37;padding:8px;text-align:left;border:1px solid #D5DDD9;font-weight:600}
       td{padding:6px 8px;border:1px solid #D5DDD9}
       tr:nth-child(even){background:#F7F9F8}
@@ -242,6 +276,13 @@ const TransportHygieneChecklist = ({ onBack, user, restaurantId, restaurantName 
         <th>Хигиенно състояние</th><th>Коригиращи действия</th><th>Проверяващ</th>
       </tr></thead>
       <tbody>${rows}</tbody>
+    </table>
+    <h2>ТЕРМОЧАНТИ ЗА ДОСТАВКА</h2>
+    <table>
+      <thead><tr>
+        <th>№</th><th>Термочанта</th><th>Хигиенно състояние</th><th>Коригиращи действия</th><th>Проверяващ</th>
+      </tr></thead>
+      <tbody>${bagRows}</tbody>
     </table>
     <div class="footer">© 2026 Aladin Foods | by MG • Стр. 1 от 1</div>
     </body></html>`;
@@ -481,6 +522,99 @@ const TransportHygieneChecklist = ({ onBack, user, restaurantId, restaurantName 
             </div>
           </div>
         )}
+
+        {/* ═══ ТЕРМОЧАНТИ ЗА ДОСТАВКА ═══ */}
+        <div style={{
+          backgroundColor: DS.color.surface, borderRadius: DS.radius,
+          boxShadow: DS.shadow.sm, border: `1px solid ${DS.color.borderLight}`,
+          overflow: 'hidden', marginBottom: '12px', animation: 'cf 0.4s ease',
+        }}>
+          <div style={{
+            padding: '10px 14px', backgroundColor: '#FFF7ED',
+            borderBottom: `1px solid ${DS.color.borderLight}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+              <span style={{ fontFamily: DS.font, fontSize: '13px', fontWeight: 700, color: '#9A3412', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Термочанти за доставка</span>
+            </div>
+            <button onClick={addBag} style={{
+              display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 12px',
+              backgroundColor: '#F97316', color: '#fff', border: 'none',
+              borderRadius: DS.radius, fontFamily: DS.font, fontSize: '11px', fontWeight: 600,
+              cursor: 'pointer',
+            }}>
+              {ic.plus('#fff')} Добави
+            </button>
+          </div>
+
+          <div style={{ padding: pad }}>
+            {thermalBags.map((bag, idx) => (
+              <div key={bag.id} style={{
+                padding: '12px', marginBottom: idx < thermalBags.length - 1 ? '10px' : 0,
+                backgroundColor: idx % 2 === 0 ? DS.color.surface : DS.color.surfaceAlt,
+                border: `1px solid ${DS.color.borderLight}`,
+                animation: `stagger 0.3s ease ${idx * 50}ms both`,
+              }}>
+                {/* Row 1: Number + Name + Delete */}
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+                  <span style={{ fontFamily: DS.font, fontSize: '14px', fontWeight: 700, color: '#F97316', minWidth: '28px' }}>#{idx + 1}</span>
+                  <DInput label="Термочанта" value={bag.bagName} onChange={e => updateBag(idx, 'bagName', e.target.value)} placeholder="Напр. Термочанта №1, Голяма синя..." />
+                  {thermalBags.length > 1 && (
+                    <button onClick={() => removeBag(idx)} style={{
+                      display: 'flex', alignItems: 'center', padding: '6px',
+                      backgroundColor: DS.color.dangerBg, color: DS.color.danger,
+                      border: 'none', borderRadius: DS.radius, cursor: 'pointer', flexShrink: 0, marginTop: '18px',
+                    }}>
+                      {ic.trash(DS.color.danger)}
+                    </button>
+                  )}
+                </div>
+
+                {/* Row 2: Hygiene status buttons */}
+                <div style={{ marginBottom: '8px' }}>
+                  <label style={{ display: 'block', fontFamily: DS.font, fontSize: '11px', fontWeight: 600, color: DS.color.graphiteLight, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
+                    Хигиенно състояние
+                  </label>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {HYGIENE_STATUS.map(opt => {
+                      const selected = bag.hygieneStatus === opt.value;
+                      return (
+                        <button key={opt.value} onClick={() => updateBag(idx, 'hygieneStatus', opt.value)} style={{
+                          flex: 1, minWidth: mob ? '80px' : '100px', padding: '8px 10px',
+                          backgroundColor: selected ? opt.bg : DS.color.surfaceAlt,
+                          border: `2px solid ${selected ? opt.color : DS.color.borderLight}`,
+                          borderRadius: DS.radius, cursor: 'pointer',
+                          fontFamily: DS.font, fontSize: '12px', fontWeight: selected ? 700 : 500,
+                          color: selected ? opt.color : DS.color.graphiteMuted,
+                          transition: 'all 0.15s',
+                        }}>
+                          {selected && '✓ '}{opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Row 3: Corrective actions (if not добро) */}
+                {bag.hygieneStatus && bag.hygieneStatus !== 'добро' && (
+                  <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: DS.color.warningBg, border: `1px solid ${DS.color.warning}30` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                      {ic.alert(DS.color.warning)}
+                      <span style={{ fontFamily: DS.font, fontSize: '10px', fontWeight: 600, color: DS.color.warning, textTransform: 'uppercase' }}>Коригиращи действия</span>
+                    </div>
+                    <textarea value={bag.correctiveActions} onChange={e => updateBag(idx, 'correctiveActions', e.target.value)}
+                      placeholder="Опишете предприетите коригиращи действия..."
+                      rows={2} style={{ width: '100%', padding: '8px 10px', backgroundColor: DS.color.surface, border: `1.5px solid ${DS.color.borderLight}`, borderRadius: DS.radius, fontSize: '13px', fontFamily: DS.font, color: DS.color.graphite, outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
+                  </div>
+                )}
+
+                {/* Row 4: Inspector */}
+                <DInput label="Проверяващ" value={bag.inspector} onChange={e => updateBag(idx, 'inspector', e.target.value)} placeholder="Име на проверяващия" />
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* ═══ FOOTER ═══ */}
         <div style={{ textAlign: 'center', padding: '16px', fontFamily: DS.font, animation: 'cf 0.5s ease' }}>

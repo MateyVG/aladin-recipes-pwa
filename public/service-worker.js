@@ -1,14 +1,14 @@
 // public/service-worker.js
 
-const CACHE_NAME = 'checklist-pwa-v1'
-const RUNTIME_CACHE = 'checklist-runtime-v1'
+const CACHE_VERSION = 'v5' // ← Смени на v6, v7... при всеки deploy!
+const CACHE_NAME = `checklist-cache-${CACHE_VERSION}`
+const RUNTIME_CACHE = `checklist-runtime-${CACHE_VERSION}`
 
 // Файлове за кеширане при инсталация
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  // Не кешираме bundle.js и CSS тук, за да избегнем грешки при първоначална инсталация
 ]
 
 // Домейни които НЕ трябва да се кешират
@@ -16,36 +16,36 @@ const SKIP_CACHE_DOMAINS = [
   'supabase.co',
   'googleapis.com',
   'gstatic.com',
-  'reasonlabsapi.com', // Добавено за блокиране на external analytics/tracking APIs
+  'reasonlabsapi.com',
 ]
 
 // Install event - кешира статични файлове
 self.addEventListener('install', (event) => {
-  console.log('[Service Worker] Installing...')
+  console.log('[Service Worker] Installing version:', CACHE_VERSION)
   
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('[Service Worker] Caching static assets')
-        // Кешираме само основните файлове, без грешки ако някой липсва
         return cache.addAll(STATIC_ASSETS)
           .catch(err => {
             console.warn('[Service Worker] Some assets failed to cache:', err)
           })
       })
-      .then(() => self.skipWaiting())
+      .then(() => self.skipWaiting()) // Активира веднага без чакане
   )
 })
 
-// Activate event - изчиства стари кешове
+// Activate event - изчиства ВСИЧКИ стари кешове
 self.addEventListener('activate', (event) => {
-  console.log('[Service Worker] Activating...')
+  console.log('[Service Worker] Activating version:', CACHE_VERSION)
   
   event.waitUntil(
     caches.keys()
       .then((cacheNames) => {
         return Promise.all(
           cacheNames.map((cacheName) => {
+            // Изтрива всичко което не е текущата версия
             if (cacheName !== CACHE_NAME && cacheName !== RUNTIME_CACHE) {
               console.log('[Service Worker] Deleting old cache:', cacheName)
               return caches.delete(cacheName)
@@ -53,30 +53,33 @@ self.addEventListener('activate', (event) => {
           })
         )
       })
-      .then(() => self.clients.claim())
+      .then(() => self.clients.claim()) // Поема контрол веднага
   )
 })
 
-// Fetch event - Network First strategy с fallback към cache
+// SKIP_WAITING съобщение от main.jsx
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    console.log('[Service Worker] Skip waiting — activating new version')
+    self.skipWaiting()
+  }
+})
+
+// Fetch event
 self.addEventListener('fetch', (event) => {
   const { request } = event
   const url = new URL(request.url)
 
-  // КРИТИЧНА ПРОВЕРКА: Игнорираме заявки към external домейни (различни от origin на приложението)
+  // Игнорираме external домейни (освен Supabase)
   if (url.origin !== location.origin) {
-    // Проверяваме дали е към одобрено external API
     const isAllowedExternal = url.hostname.includes('supabase.co')
-    
-    // Ако не е към нашия origin и не е одобрено external API, просто връщаме fetch без кеширане
     if (!isAllowedExternal) {
-      console.log('[Service Worker] Skipping external domain:', url.hostname)
-      return // Важно: не обработваме този request
+      return
     }
   }
 
   // Пропускаме кеширане за external APIs
   if (SKIP_CACHE_DOMAINS.some(domain => url.hostname.includes(domain))) {
-    console.log('[Service Worker] Skipping cache for domain:', url.hostname)
     return
   }
 
@@ -85,13 +88,13 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Network First стратегия за API заявки
+  // Network First за API заявки
   if (url.pathname.startsWith('/api') || url.hostname.includes('supabase')) {
     event.respondWith(networkFirstStrategy(request))
     return
   }
 
-  // Cache First стратегия за статични файлове
+  // Cache First за статични файлове
   if (request.destination === 'image' || 
       request.destination === 'font' || 
       request.destination === 'style' ||
@@ -107,9 +110,8 @@ self.addEventListener('fetch', (event) => {
 // Network First - опитва мрежа първо, fallback към cache
 async function networkFirstStrategy(request) {
   try {
-    const networkResponse = await fetch(request)
+    const networkResponse = await fetch(request, { cache: 'no-cache' })
     
-    // Кешираме само успешните отговори
     if (networkResponse && networkResponse.status === 200) {
       const cache = await caches.open(RUNTIME_CACHE)
       cache.put(request, networkResponse.clone())
@@ -117,14 +119,13 @@ async function networkFirstStrategy(request) {
     
     return networkResponse
   } catch (error) {
-    console.log('[Service Worker] Network request failed, trying cache:', request.url)
+    console.log('[Service Worker] Network failed, trying cache:', request.url)
     const cachedResponse = await caches.match(request)
     
     if (cachedResponse) {
       return cachedResponse
     }
     
-    // Връщаме offline страница или JSON отговор
     if (request.headers.get('accept')?.includes('application/json')) {
       return new Response(JSON.stringify({ 
         error: 'Offline', 
@@ -153,7 +154,6 @@ async function cacheFirstStrategy(request) {
   try {
     const networkResponse = await fetch(request)
     
-    // Кешираме само успешните отговори
     if (networkResponse && networkResponse.status === 200) {
       const cache = await caches.open(RUNTIME_CACHE)
       cache.put(request, networkResponse.clone())
@@ -184,7 +184,7 @@ async function staleWhileRevalidateStrategy(request) {
   return cachedResponse || fetchPromise
 }
 
-// Background Sync - за offline submissions
+// Background Sync
 self.addEventListener('sync', (event) => {
   console.log('[Service Worker] Background sync:', event.tag)
   
@@ -197,7 +197,6 @@ async function syncSubmissions() {
   console.log('[Service Worker] Syncing offline submissions...')
   
   try {
-    // Тук ще извикаме sync функцията от offlineDB
     const syncResponse = await fetch('/api/sync-offline-data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' }
@@ -206,7 +205,6 @@ async function syncSubmissions() {
     if (syncResponse.ok) {
       console.log('[Service Worker] Sync successful')
       
-      // Уведоми всички клиенти че sync е успешен
       const clients = await self.clients.matchAll()
       clients.forEach(client => {
         client.postMessage({
@@ -217,11 +215,11 @@ async function syncSubmissions() {
     }
   } catch (error) {
     console.error('[Service Worker] Sync failed:', error)
-    throw error // Ще се опита пак автоматично
+    throw error
   }
 }
 
-// Push Notifications (за бъдещо използване)
+// Push Notifications
 self.addEventListener('push', (event) => {
   const data = event.data ? event.data.json() : {}
   
@@ -248,14 +246,12 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientList) => {
-        // Ако има отворен прозорец, фокусирай го
         for (let client of clientList) {
           if (client.url === urlToOpen && 'focus' in client) {
             return client.focus()
           }
         }
         
-        // Иначе отвори нов прозорец
         if (clients.openWindow) {
           return clients.openWindow(urlToOpen)
         }
@@ -263,4 +259,4 @@ self.addEventListener('notificationclick', (event) => {
   )
 })
 
-console.log('[Service Worker] Loaded')
+console.log('[Service Worker] Loaded — version:', CACHE_VERSION)

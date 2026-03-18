@@ -1,13 +1,9 @@
 # Netlify configuration file for React + Vite PWA
 
 [build]
-  # Build command
   command = "npm run build"
-  
-  # Output directory (where Vite builds to)
   publish = "dist"
-  
-  # Environment variables
+
   [build.environment]
     NODE_VERSION = "22"
 
@@ -17,7 +13,7 @@
   to = "/index.html"
   status = 200
 
-# Headers for PWA support
+# Глобални security headers
 [[headers]]
   for = "/*"
   [headers.values]
@@ -25,24 +21,33 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "no-referrer-when-downgrade"
 
+# index.html — НИКОГА не се кешира (браузърът винаги взима новия)
 [[headers]]
-  for = "/manifest.json"
+  for = "/index.html"
   [headers.values]
-    Content-Type = "application/manifest+json"
+    Cache-Control = "no-cache, no-store, must-revalidate"
 
+# service-worker.js — НИКОГА не се кешира (критично!)
 [[headers]]
   for = "/service-worker.js"
   [headers.values]
     Content-Type = "application/javascript"
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+# manifest.json — кратък кеш
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Content-Type = "application/manifest+json"
     Cache-Control = "no-cache"
 
-# Cache static assets
+# Статични assets с хеш в името — кешират се 1 година
 [[headers]]
   for = "/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
-# PWA icons
+# PWA икони
 [[headers]]
   for = "/*.png"
   [headers.values]

@@ -55,6 +55,7 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
 
   const data = (editMode && editedData) ? editedData : (submission.data || {});
   const config = submission.checklist_templates?.config || {};
+  const cType = submission.checklist_type || submission.checklist_templates?.component_name || '';
 
   // === EDIT HELPERS — ALL UNCHANGED ===
   useEffect(() => { loadCorrectionsHistory(); }, [submission.id]);
@@ -437,6 +438,12 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
   // ============================================
   const renderOilChangeRecords = () => {
     if (!data.records || data.records.length === 0) return null;
+    if (cType === 'transport_hygiene' || cType === 'TransportHygieneChecklist') return null;
+    if (cType === 'thermal_processing' || cType === 'ThermalProcessingSheet') return null;
+    // Skip if data has transport-specific fields
+    if (data.thermalBags) return null;
+    if (data.records.some(r => r.regNumber !== undefined || r.vehicleType !== undefined || r.hygieneStatus !== undefined)) return null;
+    if (data.records.some(r => r.degree !== undefined)) return null;
     const filledRecords = data.records.filter(r => r.date || r.shift || r.quantity || r.oilType || r.nameSignature);
     if (filledRecords.length === 0) return null;
     return (
@@ -464,8 +471,10 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
   // ============================================
   const renderTransportHygiene = () => {
     if (!data.records || data.records.length === 0) return null;
-    const isTransport = data.records.some(r => r.regNumber !== undefined || r.vehicleType !== undefined || r.hygieneStatus !== undefined);
+    const isTransport = cType === 'transport_hygiene' || cType === 'TransportHygieneChecklist'
+      || data.records.some(r => r.regNumber !== undefined || r.vehicleType !== undefined || r.hygieneStatus !== undefined);
     if (!isTransport) return null;
+    if (cType === 'thermal_processing' || cType === 'ThermalProcessingSheet') return null;
     const filledRecords = data.records.filter(r => r.date || r.regNumber || r.driverName || r.hygieneStatus);
     if (filledRecords.length === 0) return null;
 
@@ -523,6 +532,46 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
           <span style={{ padding: '2px 8px', backgroundColor: DS.color.warningBg, color: DS.color.warning, fontWeight: 600 }}>Задоволително</span>
           <span style={{ padding: '2px 8px', backgroundColor: DS.color.dangerBg, color: DS.color.danger, fontWeight: 600 }}>Лошо</span>
         </div>
+
+        {/* Термочанти за доставка */}
+        {data.thermalBags && data.thermalBags.length > 0 && (() => {
+          const filledBags = data.thermalBags.filter(b => b.bagName || b.hygieneStatus);
+          if (filledBags.length === 0) return null;
+          return (
+            <div style={{ marginTop: '20px' }}>
+              <SecH title="Термочанти за доставка" />
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: TBDR, fontFamily: DS.font, fontSize: '12px' }}>
+                  <thead><tr style={THR}>
+                    <th style={TH}>№</th>
+                    <th style={{ ...TH, textAlign: 'left' }}>Термочанта</th>
+                    <th style={TH}>Хигиенно състояние</th>
+                    <th style={{ ...TH, textAlign: 'left' }}>Коригиращи действия</th>
+                    <th style={{ ...TH, textAlign: 'left' }}>Проверяващ</th>
+                  </tr></thead>
+                  <tbody>
+                    {filledBags.map((bag, idx) => {
+                      const origIdx = (data.thermalBags || []).indexOf(bag);
+                      const bi = origIdx >= 0 ? origIdx : idx;
+                      const sc = getStatusColor(bag.hygieneStatus);
+                      return (
+                        <tr key={idx} style={ZEBRA(idx)}>
+                          <td style={{ ...TD, textAlign: 'center', fontWeight: 700 }}>{idx + 1}</td>
+                          <EC path={`thermalBags.${bi}.bagName`} style={TD}>{bag.bagName || '-'}</EC>
+                          <td style={{ ...TD, textAlign: 'center', fontWeight: 700, color: sc.color, backgroundColor: sc.bg }}>
+                            {bag.hygieneStatus ? bag.hygieneStatus.charAt(0).toUpperCase() + bag.hygieneStatus.slice(1) : '-'}
+                          </td>
+                          <EC path={`thermalBags.${bi}.correctiveActions`} style={TD}>{bag.correctiveActions || '-'}</EC>
+                          <EC path={`thermalBags.${bi}.inspector`} style={TD}>{bag.inspector || '-'}</EC>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     );
   };
@@ -532,8 +581,10 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
   // ============================================
   const renderThermalProcessing = () => {
     if (!data.records || data.records.length === 0) return null;
-    const isThermal = data.records.some(r => r.degree !== undefined);
+    const isThermal = cType === 'thermal_processing' || cType === 'ThermalProcessingSheet'
+      || data.records.some(r => r.degree !== undefined);
     if (!isThermal) return null;
+    if (cType === 'transport_hygiene' || cType === 'TransportHygieneChecklist') return null;
     const filledRecords = data.records.filter(r => r.date || r.quantity || r.degree || r.batchL);
     if (filledRecords.length === 0) return null;
 

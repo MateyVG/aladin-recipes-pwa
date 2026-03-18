@@ -16,11 +16,27 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   </React.StrictMode>
 )
 
-// Register service worker only in production — safe version
+// Register service worker only in production — with auto-update detection
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js')
-      .then(reg => console.log('SW registered:', reg.scope))
+      .then(reg => {
+        console.log('SW registered:', reg.scope)
+
+        // Проверява за нова версия при всяко отваряне
+        reg.update()
+
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              console.log('New SW version available — reloading...')
+              newWorker.postMessage({ type: 'SKIP_WAITING' })
+              window.location.reload()
+            }
+          })
+        })
+      })
       .catch(err => console.warn('SW registration failed:', err))
   })
 }

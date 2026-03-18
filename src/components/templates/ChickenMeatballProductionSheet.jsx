@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { 
   Save, Plus, Trash2, CheckSquare, Square, Calendar, Building2, 
-  CheckCircle, RotateCcw, FileText, AlertCircle, ChevronLeft
+  CheckCircle, RotateCcw, FileText, AlertCircle, ChevronLeft, Thermometer
 } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════════
@@ -16,12 +16,11 @@ const DS = {
     graphite: '#1E2A26', graphiteMed: '#3D4F48', graphiteLight: '#6B7D76', graphiteMuted: '#95A39D',
     sage: '#A8BFB2', sageMuted: '#C5D5CB', sageLight: '#DDE8E1',
     ok: '#1B8A50', okBg: '#E8F5EE',
-    warning: '#C47F17',
-    danger: '#C53030',
+    warning: '#C47F17', warningBg: '#FEF3C7',
+    danger: '#C53030', dangerBg: '#FEE2E2',
     pending: '#6B7D76', pendingBg: '#F0F2F1',
     border: '#D5DDD9', borderLight: '#E4EBE7',
   },
-  // Един шрифт навсякъде — същият като "ПРОИЗВОДСТВЕН ЛИСТ"
   font: "'DM Sans', system-ui, sans-serif",
   radius: '0px',
   shadow: {
@@ -109,9 +108,127 @@ const ControlInput = ({ label, type = 'text', value, onChange, placeholder, styl
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   DATETIME 24H — Дата + Час (без AM/PM)
+   TEMPERATURE INPUT — ≥ 72°C вътрешна температура
    ═══════════════════════════════════════════════════════════════ */
-/* ═══ CLOCK FACE TIME PICKER ═══ */
+const TemperatureInput = ({ value, onChange }) => {
+  const [focused, setFocused] = useState(false);
+
+  const numVal = value === '' ? null : parseFloat(value);
+  const hasValue = value !== '' && value !== null && value !== undefined;
+  const isOk = hasValue && numVal >= 72;
+  const isFail = hasValue && numVal < 72;
+
+  const borderColor = focused
+    ? DS.color.primary
+    : isFail
+      ? DS.color.danger
+      : isOk
+        ? DS.color.ok
+        : DS.color.borderLight;
+
+  const bgColor = isFail
+    ? DS.color.dangerBg
+    : isOk
+      ? DS.color.okBg
+      : focused
+        ? DS.color.surface
+        : DS.color.surfaceAlt;
+
+  const boxShadow = focused
+    ? `0 0 0 3px ${DS.color.primaryGlow}`
+    : isFail
+      ? '0 0 0 3px rgba(197,48,48,0.12)'
+      : isOk
+        ? '0 0 0 3px rgba(27,138,80,0.12)'
+        : 'none';
+
+  return (
+    <div style={{ minWidth: 0 }}>
+      <label style={{
+        display: 'block', fontFamily: DS.font, fontSize: '11px', fontWeight: 600,
+        color: focused ? DS.color.primary : isFail ? DS.color.danger : isOk ? DS.color.ok : DS.color.graphiteLight,
+        textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px',
+        transition: 'color 150ms ease',
+        display: 'flex', alignItems: 'center', gap: '4px',
+      }}>
+        <Thermometer style={{ width: 11, height: 11 }} />
+        Вътрешна температура
+      </label>
+
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+        <input
+          type="number"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          placeholder="0"
+          step="0.1"
+          style={{
+            width: '100%', padding: '10px 56px 10px 12px',
+            backgroundColor: bgColor,
+            border: `1.5px solid ${borderColor}`,
+            borderRadius: DS.radius, fontSize: '14px',
+            fontFamily: DS.font, fontWeight: 600,
+            color: isFail ? DS.color.danger : isOk ? DS.color.ok : DS.color.graphite,
+            outline: 'none', transition: 'all 150ms ease',
+            boxShadow, boxSizing: 'border-box', WebkitAppearance: 'none',
+          }}
+        />
+
+        {/* °C единица */}
+        <span style={{
+          position: 'absolute', right: hasValue && (isOk || isFail) ? '36px' : '12px',
+          fontFamily: DS.font, fontSize: '13px', fontWeight: 700,
+          color: isFail ? DS.color.danger : isOk ? DS.color.ok : DS.color.graphiteMuted,
+          pointerEvents: 'none', transition: 'all 150ms',
+        }}>°C</span>
+
+        {/* Статус икона */}
+        {hasValue && (
+          <span style={{
+            position: 'absolute', right: '10px',
+            fontSize: '16px', pointerEvents: 'none',
+            transition: 'all 150ms',
+          }}>
+            {isOk ? '✓' : '✗'}
+          </span>
+        )}
+      </div>
+
+      {/* Изискване / статус банер */}
+      <div style={{
+        marginTop: '6px',
+        padding: '6px 10px',
+        backgroundColor: isFail ? DS.color.dangerBg : isOk ? DS.color.okBg : DS.color.surfaceAlt,
+        border: `1px solid ${isFail ? 'rgba(197,48,48,0.25)' : isOk ? 'rgba(27,138,80,0.25)' : DS.color.borderLight}`,
+        borderRadius: DS.radius,
+        display: 'flex', alignItems: 'center', gap: '6px',
+        transition: 'all 200ms ease',
+      }}>
+        <Thermometer style={{
+          width: 13, height: 13, flexShrink: 0,
+          color: isFail ? DS.color.danger : isOk ? DS.color.ok : DS.color.graphiteMuted,
+        }} />
+        <span style={{
+          fontFamily: DS.font, fontSize: '11px', fontWeight: 600,
+          color: isFail ? DS.color.danger : isOk ? DS.color.ok : DS.color.graphiteMuted,
+          letterSpacing: '0.01em',
+        }}>
+          {isFail
+            ? `⚠ Недостатъчна! Изисква се ≥ 72°C (сега: ${numVal}°C)`
+            : isOk
+              ? `✓ Отговаря на изискването ≥ 72°C`
+              : 'Изискване: ≥ 72°C вътрешна температура'}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   CLOCK FACE TIME PICKER
+   ═══════════════════════════════════════════════════════════════ */
 const ClockFacePicker = ({ value, onChange, label: cfLabel, style: cfStyle }) => {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState('hour');
@@ -265,7 +382,6 @@ const ClockFacePicker = ({ value, onChange, label: cfLabel, style: cfStyle }) =>
 const DateTime24Input = ({ label, value, onChange, isMobile }) => {
   const dateVal = value ? value.split('T')[0] || '' : '';
   const rawTime = value && value.includes('T') ? value.split('T')[1] || '' : '';
-
   const [fd, setFd] = useState(false);
 
   const buildValue = (d, timeStr) => {
@@ -320,7 +436,7 @@ const ProductionCard = ({ production, index, displayNumber, onUpdate, onRemove, 
         animationDelay: `${index * 60}ms`,
       }}
     >
-      {/* ─── Card Header — #E8F5EE фон, тъмен текст ─── */}
+      {/* ─── Card Header ─── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: isMobile ? '12px 14px' : '14px 18px',
@@ -419,6 +535,14 @@ const ProductionCard = ({ production, index, displayNumber, onUpdate, onRemove, 
           placeholder="L"
         />
 
+        {/* ─── ТЕМПЕРАТУРА ─── */}
+        <div style={{ gridColumn: '1 / -1' }}>
+          <TemperatureInput
+            value={production.internalTemp ?? ''}
+            onChange={val => onUpdate(production.id, 'internalTemp', val)}
+          />
+        </div>
+
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={{
             display: 'block', fontFamily: DS.font, fontSize: '11px', fontWeight: 600,
@@ -494,19 +618,17 @@ const ChickenMeatballProductionSheet = ({ template, config, department, restaura
   const [savedEmployees, setSavedEmployees] = useState([]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingCount, setPendingCount] = useState(0);
-  const [syncStatus, setSyncStatus] = useState(''); // '', 'syncing', 'synced', 'error'
+  const [syncStatus, setSyncStatus] = useState('');
 
   const [productions, setProductions] = useState([
-    { id: 1, dateTime: '', type: '', quantity: '', batchL: '', employeeName: '', checked: false }
+    { id: 1, dateTime: '', type: '', quantity: '', batchL: '', internalTemp: '', employeeName: '', checked: false }
   ]);
 
-  // ─── Pending submissions queue (localStorage) ───
   const PENDING_KEY = `pending_submissions_${template.id}`;
 
   const getPending = () => {
-    try {
-      return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]');
-    } catch { return []; }
+    try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); }
+    catch { return []; }
   };
 
   const savePending = (queue) => {
@@ -520,14 +642,11 @@ const ChickenMeatballProductionSheet = ({ template, config, department, restaura
     savePending(queue);
   };
 
-  // ─── Sync pending submissions when online ───
   const syncPending = async () => {
     const queue = getPending();
     if (queue.length === 0) return;
-
     setSyncStatus('syncing');
     const failed = [];
-
     for (const item of queue) {
       try {
         const { savedAt, ...submissionData } = item;
@@ -538,9 +657,7 @@ const ChickenMeatballProductionSheet = ({ template, config, department, restaura
         failed.push(item);
       }
     }
-
     savePending(failed);
-
     if (failed.length === 0) {
       setSyncStatus('synced');
       setAutoSaveStatus(`✓ ${queue.length} ${queue.length === 1 ? 'запис синхронизиран' : 'записа синхронизирани'}`);
@@ -551,13 +668,11 @@ const ChickenMeatballProductionSheet = ({ template, config, department, restaura
     setTimeout(() => { setSyncStatus(''); setAutoSaveStatus(''); }, 4000);
   };
 
-  // ─── Online/Offline detection ───
   useEffect(() => {
     const goOnline = () => { setIsOnline(true); syncPending(); };
     const goOffline = () => setIsOnline(false);
     window.addEventListener('online', goOnline);
     window.addEventListener('offline', goOffline);
-    // Initial: count pending and try sync
     setPendingCount(getPending().length);
     if (navigator.onLine && getPending().length > 0) syncPending();
     return () => {
@@ -573,7 +688,7 @@ const ChickenMeatballProductionSheet = ({ template, config, department, restaura
 
   const hasAnyData = () => {
     if (manager.trim()) return true;
-    return productions.some(p => p.dateTime || p.type || p.quantity || p.batchL || p.employeeName);
+    return productions.some(p => p.dateTime || p.type || p.quantity || p.batchL || p.internalTemp || p.employeeName);
   };
 
   useEffect(() => {
@@ -619,7 +734,7 @@ const ChickenMeatballProductionSheet = ({ template, config, department, restaura
 
   const clearDraft = () => {
     if (window.confirm('Сигурни ли сте, че искате да изчистите текущия драфт и да започнете нов производствен лист?')) {
-      setProductions([{ id: 1, dateTime: '', type: '', quantity: '', batchL: '', employeeName: '', checked: false }]);
+      setProductions([{ id: 1, dateTime: '', type: '', quantity: '', batchL: '', internalTemp: '', employeeName: '', checked: false }]);
       setManager('');
       localStorage.removeItem(`draft_${template.id}_${currentDate}`);
       setHasDraft(false);
@@ -640,7 +755,7 @@ const ChickenMeatballProductionSheet = ({ template, config, department, restaura
   };
 
   const addProduction = () => {
-    setProductions([{ id: Date.now(), dateTime: '', type: '', quantity: '', batchL: '', employeeName: '', checked: false }, ...productions]);
+    setProductions([{ id: Date.now(), dateTime: '', type: '', quantity: '', batchL: '', internalTemp: '', employeeName: '', checked: false }, ...productions]);
     setTimeout(() => {
       if (cardsContainerRef.current) cardsContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
@@ -670,29 +785,23 @@ const ChickenMeatballProductionSheet = ({ template, config, department, restaura
       synced: true,
     };
 
-    // Опит за получаване на user ID (може да е кеширан)
     try {
       const { data: userData } = await supabase.auth.getUser();
       if (userData?.user?.id) submissionData.submitted_by = userData.user.id;
-    } catch (e) {
-      // Offline — ще запишем без user ID и ще го добавим при sync
-      console.log('Cannot get user (offline)');
-    }
+    } catch (e) { console.log('Cannot get user (offline)'); }
 
     if (!navigator.onLine) {
-      // ═══ OFFLINE — запиши локално ═══
       addToPending(submissionData);
       localStorage.removeItem(`draft_${template.id}_${currentDate}`);
       setHasDraft(false);
       setAutoSaveStatus('📱 Запазено офлайн — ще се синхронизира автоматично');
       setTimeout(() => setAutoSaveStatus(''), 4000);
-      setProductions([{ id: Date.now(), dateTime: '', type: '', quantity: '', batchL: '', employeeName: '', checked: false }]);
+      setProductions([{ id: Date.now(), dateTime: '', type: '', quantity: '', batchL: '', internalTemp: '', employeeName: '', checked: false }]);
       setManager('');
       setLoading(false);
       return;
     }
 
-    // ═══ ONLINE — стандартен submit ═══
     try {
       const { error } = await supabase.from('checklist_submissions').insert(submissionData);
       if (error) throw error;
@@ -700,18 +809,15 @@ const ChickenMeatballProductionSheet = ({ template, config, department, restaura
       setHasDraft(false);
       setAutoSaveStatus('✓ Производственият лист е запазен успешно');
       setTimeout(() => setAutoSaveStatus(''), 3000);
-      setProductions([{ id: Date.now(), dateTime: '', type: '', quantity: '', batchL: '', employeeName: '', checked: false }]);
+      setProductions([{ id: Date.now(), dateTime: '', type: '', quantity: '', batchL: '', internalTemp: '', employeeName: '', checked: false }]);
       setManager('');
-
-      // Опитай sync на чакащи записи
       if (getPending().length > 0) syncPending();
     } catch (error) {
       console.error('Submit error:', error);
-      // Ако submit-ът се провали (напр. network timeout) — запиши офлайн
       addToPending(submissionData);
       setAutoSaveStatus('⚠ Грешка при връзка — запазено офлайн');
       setTimeout(() => setAutoSaveStatus(''), 4000);
-      setProductions([{ id: Date.now(), dateTime: '', type: '', quantity: '', batchL: '', employeeName: '', checked: false }]);
+      setProductions([{ id: Date.now(), dateTime: '', type: '', quantity: '', batchL: '', internalTemp: '', employeeName: '', checked: false }]);
       setManager('');
     } finally { setLoading(false); }
   };
@@ -721,7 +827,6 @@ const ChickenMeatballProductionSheet = ({ template, config, department, restaura
   return (
     <>
       <style>{GLOBAL_CSS}</style>
-
       <div style={{
         minHeight: '100vh', backgroundColor: DS.color.bg,
         fontFamily: DS.font, color: DS.color.graphite,
@@ -793,8 +898,6 @@ const ChickenMeatballProductionSheet = ({ template, config, department, restaura
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '16px' }}>
-            
-            {/* ─── Online/Offline индикатор ─── */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: '6px',
               backgroundColor: isOnline ? 'rgba(27,138,80,0.15)' : 'rgba(197,48,48,0.2)',
