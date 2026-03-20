@@ -9,14 +9,31 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       workbox: {
-        // Кеширай само assets, не API заявки
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        // Не кеширай Supabase заявки
-        navigateFallbackDenylist: [/^\/rest\/v1/, /^\/auth\/v1/],
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
-            // Supabase API — никога не кешира
-            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
+            // Всички Supabase REST заявки — NetworkFirst
+            // При интернет: зарежда свежи данни и ги кешира
+            // При офлайн: показва последно кешираните данни
+            urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\/.*/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'supabase-data',
+              expiration: {
+                maxEntries: 200,
+                maxAgeSeconds: 60 * 60 * 24 * 7, // 7 дни
+              },
+              networkTimeoutSeconds: 8,
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          {
+            // Supabase Auth — NetworkOnly (не кешира токени)
+            urlPattern: /^https:\/\/.*\.supabase\.co\/auth\/.*/i,
             handler: 'NetworkOnly',
           },
           {
@@ -38,7 +55,6 @@ export default defineConfig({
             },
           },
         ],
-        // Изчисти стар кеш при update
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         clientsClaim: true,
@@ -69,7 +85,6 @@ export default defineConfig({
     chunkSizeWarningLimit: 1500,
     rollupOptions: {
       output: {
-        // Разделяме кода на по-малки chunks
         manualChunks: {
           'react-vendor': ['react', 'react-dom'],
           'supabase-vendor': ['@supabase/supabase-js'],
