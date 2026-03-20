@@ -147,14 +147,24 @@ const DepartmentView = ({ department, restaurantId, onBack }) => {
   const loadTemplates = async () => {
     setLoading(true)
     try {
+      // Вземи точното ime на отдела по id
+      const { data: deptData, error: deptError } = await supabase
+        .from('departments')
+        .select('name')
+        .eq('id', department.id)
+        .single()
+      if (deptError) throw deptError
+      const deptName = deptData?.name || department.name
+
       const { data: restaurantTemplates, error: rtError } = await supabase
         .from('restaurant_templates')
         .select(`*, checklist_templates (id, name, description, config, component_name, template_departments (department_name))`)
         .eq('restaurant_id', restaurantId)
         .eq('enabled', true)
       if (rtError) throw rtError
+
       const filtered = restaurantTemplates
-        .filter(rt => (rt.checklist_templates?.template_departments || []).some(td => td.department_name === department.name))
+        .filter(rt => (rt.checklist_templates?.template_departments || []).some(td => td.department_name === deptName))
         .map(rt => rt.checklist_templates)
       setTemplates(filtered)
     } catch (error) {

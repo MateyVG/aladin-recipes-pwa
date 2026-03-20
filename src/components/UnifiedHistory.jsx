@@ -58,7 +58,7 @@ const Btn = ({ children, onClick, variant: vr = 'primary', icon: ic, sm, style: 
   return <button onClick={onClick} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: sm ? '5px 10px' : '10px 18px', backgroundColor: v[0], color: v[1], border: vr === 'ghost' ? `1px solid ${DS.color.borderLight}` : 'none', borderRadius: DS.radius, fontFamily: DS.font, fontSize: sm ? '11px' : '13px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', minHeight: sm ? '28px' : '40px', ...s }}>{ic && <Ic n={ic} sz={sm ? 11 : 14} c={v[1]} />}{children}</button>;
 };
 
-// ─── Детайлен изглед за здравна книжка — таблица за печат ───
+// ─── Детайлен изглед за здравна книжка ───
 const HealthBookDetail = ({ record, onBack, mob }) => {
   const rows = (record.health_book_rows || []).filter(r => r.employee_name?.trim());
 
@@ -93,24 +93,9 @@ const HealthBookDetail = ({ record, onBack, mob }) => {
     @media print {
       .no-print { display: none !important; }
       body { background: white !important; margin: 0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .print-page {
-        background: white !important;
-        box-shadow: none !important;
-        padding: 6mm !important;
-        max-width: 100% !important;
-        width: 100% !important;
-      }
-      .print-table-wrap {
-        overflow: visible !important;
-        width: 100% !important;
-      }
-      table {
-        width: 100% !important;
-        min-width: unset !important;
-        font-size: 8px !important;
-        table-layout: fixed !important;
-        page-break-inside: auto;
-      }
+      .print-page { background: white !important; box-shadow: none !important; padding: 6mm !important; max-width: 100% !important; width: 100% !important; }
+      .print-table-wrap { overflow: visible !important; width: 100% !important; }
+      table { width: 100% !important; min-width: unset !important; font-size: 8px !important; table-layout: fixed !important; page-break-inside: auto; }
       th { font-size: 7px !important; padding: 4px 5px !important; }
       td { font-size: 8px !important; padding: 4px 5px !important; }
       tr { page-break-inside: avoid; }
@@ -119,34 +104,19 @@ const HealthBookDetail = ({ record, onBack, mob }) => {
       .print-header p { font-size: 9px !important; }
       .print-header img { height: 36px !important; }
       .print-doc-info { padding: 6px 10px !important; }
-      @page {
-        size: A4 landscape;
-        margin: 8mm 6mm;
-      }
+      @page { size: A4 landscape; margin: 8mm 6mm; }
     }
   `;
 
-  const thS = {
-    padding: '8px 10px', backgroundColor: DS.color.primary, color: 'white',
-    fontFamily: DS.font, fontSize: '11px', fontWeight: 700, textTransform: 'uppercase',
-    letterSpacing: '0.03em', borderRight: '1px solid rgba(255,255,255,0.2)',
-    textAlign: 'center', whiteSpace: 'nowrap',
-  };
+  const thS = { padding: '8px 10px', backgroundColor: DS.color.primary, color: 'white', fontFamily: DS.font, fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', borderRight: '1px solid rgba(255,255,255,0.2)', textAlign: 'center', whiteSpace: 'nowrap' };
   const thSep = { ...thS, borderLeft: '2px solid rgba(255,255,255,0.35)' };
-  const tdS = (isExp, isOdd) => ({
-    padding: '9px 10px', borderRight: `1px solid ${DS.color.borderLight}`,
-    borderBottom: `1px solid ${DS.color.borderLight}`,
-    fontFamily: DS.font, fontSize: '12px', verticalAlign: 'middle',
-    backgroundColor: isExp ? '#FEF2F2' : isOdd ? DS.color.surfaceAlt : DS.color.surface,
-  });
+  const tdS = (isExp, isOdd) => ({ padding: '9px 10px', borderRight: `1px solid ${DS.color.borderLight}`, borderBottom: `1px solid ${DS.color.borderLight}`, fontFamily: DS.font, fontSize: '12px', verticalAlign: 'middle', backgroundColor: isExp ? '#FEF2F2' : isOdd ? DS.color.surfaceAlt : DS.color.surface });
   const tdSep = (isExp, isOdd) => ({ ...tdS(isExp, isOdd), borderLeft: `2px solid ${DS.color.borderLight}` });
 
   return (
     <>
       <style>{PRINT_CSS}</style>
       <div style={{ minHeight:'100vh', backgroundColor:DS.color.bg, fontFamily:DS.font, color:DS.color.graphite, display:'flex', flexDirection:'column' }}>
-
-        {/* Top bar — скрива се при печат */}
         <div className="no-print" style={{ position:'sticky', top:0, zIndex:100, backgroundColor:DS.color.graphite, padding:'0 16px', display:'flex', alignItems:'center', justifyContent:'space-between', height:'48px', boxShadow:'0 2px 8px rgba(0,0,0,0.2)' }}>
           <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'6px 12px', backgroundColor:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', cursor:'pointer', color:'#fff', fontFamily:DS.font, fontSize:'12px', fontWeight:600 }}>
             <Ic n="back" sz={14} c="#fff"/> Назад
@@ -154,26 +124,18 @@ const HealthBookDetail = ({ record, onBack, mob }) => {
           <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
             {expired > 0 && <span style={{ backgroundColor:DS.color.danger, color:'#fff', fontFamily:DS.font, fontSize:'11px', fontWeight:700, padding:'4px 10px' }}>{expired} ИЗТЕКЛИ</span>}
             {expiring > 0 && <span style={{ backgroundColor:DS.color.warning, color:'#fff', fontFamily:DS.font, fontSize:'11px', fontWeight:700, padding:'4px 10px' }}>{expiring} ИЗТИЧАТ</span>}
-            <button onClick={()=>window.print()} style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 20px', backgroundColor:'#fff', border:'none', cursor:'pointer', color:DS.color.primary, fontFamily:DS.font, fontSize:'13px', fontWeight:700, letterSpacing:'0.02em' }}>
+            <button onClick={()=>window.print()} style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 20px', backgroundColor:'#fff', border:'none', cursor:'pointer', color:DS.color.primary, fontFamily:DS.font, fontSize:'13px', fontWeight:700 }}>
               🖨️ Печат / PDF
             </button>
           </div>
         </div>
-
-        {/* Документ */}
         <div className="print-page" style={{ maxWidth:'1400px', margin:'0 auto', padding: mob ? '16px 12px' : '24px', flex:1, width:'100%' }}>
-
-          {/* Официална шапка */}
           <div className="print-header" style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'20px', flexWrap:'wrap', gap:'12px' }}>
             <div style={{ display:'flex', alignItems:'center', gap:'14px' }}>
               <img src={LOGO} alt="Aladin Foods" style={{ height:'52px', objectFit:'contain', flexShrink:0 }} onError={e=>{e.target.style.display='none'}}/>
               <div>
-                <h1 style={{ fontSize:'18px', fontWeight:700, color:DS.color.primary, margin:0, textTransform:'uppercase', fontFamily:DS.font, letterSpacing:'-0.01em' }}>
-                  Регистър на здравните книжки
-                </h1>
-                <p style={{ fontFamily:DS.font, fontSize:'11px', color:DS.color.graphiteLight, margin:'3px 0 0', fontWeight:500 }}>
-                  Контрол на работното облекло и хигиена на персонала
-                </p>
+                <h1 style={{ fontSize:'18px', fontWeight:700, color:DS.color.primary, margin:0, textTransform:'uppercase', fontFamily:DS.font }}>Регистър на здравните книжки</h1>
+                <p style={{ fontFamily:DS.font, fontSize:'11px', color:DS.color.graphiteLight, margin:'3px 0 0', fontWeight:500 }}>Контрол на работното облекло и хигиена на персонала</p>
               </div>
             </div>
             <div className="print-doc-info" style={{ display:'flex', gap:'16px', backgroundColor:DS.color.surface, border:`1px solid ${DS.color.borderLight}`, padding:'10px 16px' }}>
@@ -185,8 +147,6 @@ const HealthBookDetail = ({ record, onBack, mob }) => {
               ))}
             </div>
           </div>
-
-          {/* Stat карти — само за екран */}
           <div className="no-print" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'10px', marginBottom:'16px' }}>
             {[
               { label:'Служители', value:rows.length, bg:DS.color.okBg, color:DS.color.primary },
@@ -199,21 +159,10 @@ const HealthBookDetail = ({ record, onBack, mob }) => {
               </div>
             ))}
           </div>
-
-          {/* ═══ ТАБЛИЦА ═══ */}
           <div className="print-table-wrap" style={{ backgroundColor:DS.color.surface, border:`1px solid ${DS.color.borderLight}`, overflowX:'auto', boxShadow:DS.shadow.sm }}>
             <table style={{ width:'100%', borderCollapse:'collapse', minWidth:'800px', tableLayout:'fixed' }}>
               <colgroup>
-                <col style={{ width:'3%' }}/>   {/* № */}
-                <col style={{ width:'18%' }}/>  {/* Ime */}
-                <col style={{ width:'11%' }}/>  {/* Длъжност */}
-                <col style={{ width:'9%' }}/>   {/* ЕГН */}
-                <col style={{ width:'11%' }}/>  {/* Заверка 1 */}
-                <col style={{ width:'11%' }}/>  {/* Изтича 1 */}
-                <col style={{ width:'8%' }}/>   {/* Статус 1 */}
-                <col style={{ width:'11%' }}/>  {/* Заверка 2 */}
-                <col style={{ width:'11%' }}/>  {/* Изтича 2 */}
-                <col style={{ width:'7%' }}/>   {/* Статус 2 */}
+                <col style={{ width:'3%' }}/><col style={{ width:'18%' }}/><col style={{ width:'11%' }}/><col style={{ width:'9%' }}/><col style={{ width:'11%' }}/><col style={{ width:'11%' }}/><col style={{ width:'8%' }}/><col style={{ width:'11%' }}/><col style={{ width:'11%' }}/><col style={{ width:'7%' }}/>
               </colgroup>
               <thead>
                 <tr>
@@ -242,17 +191,11 @@ const HealthBookDetail = ({ record, onBack, mob }) => {
                       <td style={{ ...tdS(isExp,isOdd), fontWeight:600, color:DS.color.graphite }}>{row.employee_name}</td>
                       <td style={{ ...tdS(isExp,isOdd), textAlign:'center', color:DS.color.graphiteMed }}>{row.position || '—'}</td>
                       <td style={{ ...tdS(isExp,isOdd), textAlign:'center', fontFamily:'monospace', fontSize:'11px', color:DS.color.graphiteMed }}>{row.egn || '—'}</td>
-                      {/* Заверка 1 */}
                       <td style={{ ...tdSep(isExp,isOdd), textAlign:'center' }}>{fmtDate(row.cert_date_1)}</td>
-                      <td style={{ ...tdS(isExp,isOdd), textAlign:'center', fontWeight: d1!==null&&d1<0 ? 700 : 400, color: d1!==null&&d1<0 ? DS.color.danger : d1!==null&&d1<=30 ? DS.color.warning : DS.color.graphite }}>
-                        {fmtDate(row.expiry_date_1)}
-                      </td>
+                      <td style={{ ...tdS(isExp,isOdd), textAlign:'center', fontWeight: d1!==null&&d1<0 ? 700 : 400, color: d1!==null&&d1<0 ? DS.color.danger : d1!==null&&d1<=30 ? DS.color.warning : DS.color.graphite }}>{fmtDate(row.expiry_date_1)}</td>
                       <td style={{ ...tdS(isExp,isOdd), textAlign:'center' }}><Badge dateStr={row.expiry_date_1}/></td>
-                      {/* Заверка 2 */}
                       <td style={{ ...tdSep(isExp,isOdd), textAlign:'center' }}>{fmtDate(row.cert_date_2)}</td>
-                      <td style={{ ...tdS(isExp,isOdd), textAlign:'center', fontWeight: d2!==null&&d2<0 ? 700 : 400, color: d2!==null&&d2<0 ? DS.color.danger : d2!==null&&d2<=30 ? DS.color.warning : DS.color.graphite }}>
-                        {fmtDate(row.expiry_date_2)}
-                      </td>
+                      <td style={{ ...tdS(isExp,isOdd), textAlign:'center', fontWeight: d2!==null&&d2<0 ? 700 : 400, color: d2!==null&&d2<0 ? DS.color.danger : d2!==null&&d2<=30 ? DS.color.warning : DS.color.graphite }}>{fmtDate(row.expiry_date_2)}</td>
                       <td style={{ ...tdS(isExp,isOdd), textAlign:'center', borderRight:'none' }}><Badge dateStr={row.expiry_date_2}/></td>
                     </tr>
                   );
@@ -260,25 +203,17 @@ const HealthBookDetail = ({ record, onBack, mob }) => {
               </tbody>
             </table>
           </div>
-
-          {/* Подпис — само за печат */}
           <div style={{ marginTop:'32px', display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
             <div className="no-print">
               <button onClick={()=>window.print()} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'12px 28px', backgroundColor:DS.color.primary, border:'none', cursor:'pointer', color:'#fff', fontFamily:DS.font, fontSize:'14px', fontWeight:700, boxShadow:'0 4px 12px rgba(27,94,55,0.3)' }}>
                 🖨️ Печат / Запази PDF
               </button>
-              <p style={{ fontFamily:DS.font, fontSize:'11px', color:DS.color.graphiteLight, marginTop:'6px' }}>
-                Препоръчан формат: A4 Landscape
-              </p>
+              <p style={{ fontFamily:DS.font, fontSize:'11px', color:DS.color.graphiteLight, marginTop:'6px' }}>Препоръчан формат: A4 Landscape</p>
             </div>
             <div style={{ textAlign:'center', minWidth:'200px' }}>
-              <div style={{ borderTop:`1px solid ${DS.color.graphite}`, paddingTop:'6px', fontFamily:DS.font, fontSize:'11px', color:DS.color.graphiteLight }}>
-                Утвърждавам: ( Управител )
-              </div>
+              <div style={{ borderTop:`1px solid ${DS.color.graphite}`, paddingTop:'6px', fontFamily:DS.font, fontSize:'11px', color:DS.color.graphiteLight }}>Утвърждавам: ( Управител )</div>
             </div>
           </div>
-
-          {/* Footer */}
           <div style={{ textAlign:'center', marginTop:'24px', paddingTop:'16px', borderTop:`1px solid ${DS.color.borderLight}`, color:DS.color.graphiteMuted, fontFamily:DS.font, fontSize:'10px' }}>
             © 2026 Aladin Foods | by MG • Актуализиран на {new Date(record.updated_at).toLocaleDateString('bg-BG')}
           </div>
@@ -296,33 +231,41 @@ const UnifiedHistory = ({ department, restaurantId, onBack }) => {
   const [loading, setLoading] = useState(true);
   const [records, setRecords] = useState([]);
   const [selectedRecord, setSelectedRecord] = useState(null);
-  const [filter, setFilter] = useState({ startDate: '', endDate: '', type: 'all' });
+  const [filter, setFilter] = useState({ startDate: '', endDate: '', type: 'all', showMerged: false });
   const [hoverId, setHoverId] = useState(null);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 30;
 
-  useEffect(() => { loadAllRecords(); }, [department.id, filter]);
+  // Merge state
+  const [mergeMode, setMergeMode] = useState(false);
+  const [mergeSelected, setMergeSelected] = useState([]);
+  const [merging, setMerging] = useState(false);
+
+  useEffect(() => { setPage(0); loadAllRecords(); }, [department.id, filter]);
 
   const loadAllRecords = async () => {
     setLoading(true);
     try {
-      // ─── 1. Checklist submissions ───
       let checklistQuery = supabase
         .from('checklist_submissions')
         .select('*, checklist_templates(name, description, config), profiles(full_name, email)')
         .eq('restaurant_id', restaurantId)
         .eq('department_id', department.id)
-        .order('submission_date', { ascending: false });
+        .order('submission_date', { ascending: false })
+        .limit(200);
+      if (!filter.showMerged) checklistQuery = checklistQuery.eq('is_merged', false);
       if (filter.startDate) checklistQuery = checklistQuery.gte('submission_date', filter.startDate);
       if (filter.endDate) checklistQuery = checklistQuery.lte('submission_date', filter.endDate);
 
-      // ─── 2. Incoming control ───
       let incomingQuery = supabase
         .from('incoming_control_records')
-        .select('*, incoming_control_materials(*)')
-        .order('control_date', { ascending: false });
+        .select('id, control_date, supplier, status, created_at, incoming_control_materials(id)')
+        .eq('restaurant_id', restaurantId)
+        .order('control_date', { ascending: false })
+        .limit(100);
       if (filter.startDate) incomingQuery = incomingQuery.gte('control_date', filter.startDate);
       if (filter.endDate) incomingQuery = incomingQuery.lte('control_date', filter.endDate);
 
-      // ─── 3. Health books (взимаме последния snapshot от health_books) ───
       let healthQuery = supabase
         .from('health_books')
         .select('id, restaurant_id, employee_name, position, egn, cert_date_1, expiry_date_1, cert_date_2, expiry_date_2, updated_at')
@@ -351,7 +294,6 @@ const UnifiedHistory = ({ department, restaurantId, onBack }) => {
         display_subtitle: `${r.incoming_control_materials?.length || 0} материала`,
       })) : [];
 
-      // Групираме всички health_books записи в един виртуален запис
       const healthRecords = (healthData && healthData.length > 0) ? [{
         id: 'health_books',
         type: 'health',
@@ -363,16 +305,147 @@ const UnifiedHistory = ({ department, restaurantId, onBack }) => {
       }] : [];
 
       let allRecords = [...checklistRecords, ...incomingRecords, ...healthRecords];
-
       if (filter.type !== 'all') allRecords = allRecords.filter(r => r.type === filter.type);
       allRecords.sort((a, b) => new Date(b.display_date) - new Date(a.display_date));
 
       setRecords(allRecords);
+      setPage(0);
     } catch (error) {
       console.error('Error loading records:', error);
       alert('Грешка при зареждане на история');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openRecord = async (record) => {
+    if (record.type === 'incoming') {
+      const { data } = await supabase
+        .from('incoming_control_records')
+        .select('*, incoming_control_materials(*)')
+        .eq('id', record.id)
+        .single();
+      setSelectedRecord(data ? { ...data, type: 'incoming', display_date: data.control_date, display_title: 'Входящ контрол' } : record);
+    } else {
+      setSelectedRecord(record);
+    }
+  };
+
+  // ─── Merge логика ───
+  const toggleMergeSelect = (record) => {
+    if (record.type !== 'checklist') return;
+    setMergeSelected(prev => {
+      const exists = prev.find(r => r.id === record.id);
+      if (exists) return prev.filter(r => r.id !== record.id);
+      return [...prev, record];
+    });
+  };
+
+  const canMerge = mergeSelected.length >= 2 &&
+    mergeSelected.every(r => r.template_id === mergeSelected[0].template_id);
+
+  const mergeData = (dataList) => {
+    if (!dataList || dataList.length === 0) return {};
+    const merged = JSON.parse(JSON.stringify(dataList[0]));
+    const ARRAY_KEYS = ['records', 'productions', 'rows', 'dateBlocks', 'materials', 'items',
+      'allConsumption', 'allDefective', 'employees', 'zones', 'thermalBags'];
+
+    for (let i = 1; i < dataList.length; i++) {
+      const src = dataList[i];
+      for (const key of Object.keys(src)) {
+        if (ARRAY_KEYS.includes(key) && Array.isArray(src[key]) && Array.isArray(merged[key])) {
+          merged[key] = [...merged[key], ...src[key]];
+        } else if (key === 'summary' && src[key] && merged[key]) {
+          for (const sk of Object.keys(src[key])) {
+            if (Array.isArray(src[key][sk]) && Array.isArray(merged[key][sk])) {
+              merged[key][sk] = [...merged[key][sk], ...src[key][sk]];
+            }
+          }
+        } else if (key === 'productions' && typeof src[key] === 'object' && !Array.isArray(src[key])) {
+          if (!merged[key]) merged[key] = {};
+          for (const section of Object.keys(src[key])) {
+            if (Array.isArray(src[key][section])) {
+              merged[key][section] = [...(merged[key][section] || []), ...src[key][section]];
+            }
+          }
+        } else if (key === 'completionData' && typeof src[key] === 'object') {
+          merged[key] = { ...(merged[key] || {}), ...src[key] };
+        }
+      }
+    }
+    return merged;
+  };
+
+  // ─── FIXED handleMerge ───
+  const handleMerge = async () => {
+    if (!canMerge) return;
+    if (!window.confirm(`Обединяване на ${mergeSelected.length} записа в един? Оригиналните ще бъдат запазени но маркирани като обединени.`)) return;
+
+    setMerging(true);
+    try {
+      // Зареди пълните данни — с proper error handling
+      const fullRecords = await Promise.all(
+        mergeSelected.map(async (r) => {
+          const { data, error } = await supabase
+            .from('checklist_submissions')
+            .select('*')
+            .eq('id', r.id)
+            .single();
+          if (error) throw new Error(`Грешка при зареждане на запис ${r.id}: ${error.message}`);
+          if (!data) throw new Error(`Записът ${r.id} не е намерен`);
+          return data;
+        })
+      );
+
+      // Сортирай по дата (най-ранен първи)
+      fullRecords.sort((a, b) => new Date(a.submitted_at) - new Date(b.submitted_at));
+
+      // Merge data
+      const mergedData = mergeData(fullRecords.map(r => r.data || {}));
+
+      // Вземи потребителя
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error('Не сте влезли в системата');
+
+      // Създай нов обединен запис
+      const { data: newRecord, error: insertError } = await supabase
+        .from('checklist_submissions')
+        .insert({
+          template_id: fullRecords[0].template_id,
+          restaurant_id: fullRecords[0].restaurant_id,
+          department_id: fullRecords[0].department_id,
+          checklist_type: fullRecords[0].checklist_type,
+          data: mergedData,
+          submitted_by: user.id,
+          submission_date: fullRecords[0].submission_date,
+          submitted_at: new Date().toISOString(),
+          synced: true,
+          is_merged: false,
+        })
+        .select()
+        .single();
+
+      if (insertError) throw new Error(`Грешка при създаване на обединен запис: ${insertError.message}`);
+      if (!newRecord) throw new Error('Обединеният запис не беше създаден');
+
+      // Маркирай оригиналните като обединени
+      const ids = mergeSelected.map(r => r.id);
+      const { error: updateError } = await supabase
+        .from('checklist_submissions')
+        .update({ is_merged: true, merged_into: newRecord.id })
+        .in('id', ids);
+
+      if (updateError) throw new Error(`Грешка при маркиране на оригиналните записи: ${updateError.message}`);
+
+      setMergeMode(false);
+      setMergeSelected([]);
+      alert(`✅ ${mergeSelected.length} записа са обединени успешно!`);
+      loadAllRecords();
+    } catch (err) {
+      console.error('Merge error:', err);
+      alert('Грешка при обединяване: ' + err.message);
+    } finally {
+      setMerging(false);
     }
   };
 
@@ -382,7 +455,9 @@ const UnifiedHistory = ({ department, restaurantId, onBack }) => {
   const getColor = (r) => r.type==='incoming'?DS.color.incoming:r.type==='health'?DS.color.health:DS.color.primary;
   const getBg = (r) => r.type==='incoming'?DS.color.incomingBg:r.type==='health'?DS.color.healthBg:DS.color.cardHeader;
 
-  // ─── Detail routing ───
+  const pagedRecords = records.slice(0, (page + 1) * PAGE_SIZE);
+  const hasMore = records.length > pagedRecords.length;
+
   if (selectedRecord) {
     if (selectedRecord.type === 'incoming') return <IncomingControlDetail record={selectedRecord} onBack={()=>setSelectedRecord(null)}/>;
     if (selectedRecord.type === 'health') return <HealthBookDetail record={selectedRecord} onBack={()=>setSelectedRecord(null)} mob={mob}/>;
@@ -393,10 +468,34 @@ const UnifiedHistory = ({ department, restaurantId, onBack }) => {
     <div style={{ minHeight:'100vh', backgroundColor:DS.color.bg, fontFamily:DS.font, color:DS.color.graphite, display:'flex', flexDirection:'column' }}>
 
       <div style={{ position:'sticky', top:0, zIndex:100, backgroundColor:DS.color.graphite, padding:'0 16px', display:'flex', alignItems:'center', justifyContent:'space-between', height:'48px', boxShadow:'0 2px 8px rgba(0,0,0,0.2)' }}>
-        <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'6px 12px', backgroundColor:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:DS.radius, cursor:'pointer', color:'#fff', fontFamily:DS.font, fontSize:'12px', fontWeight:600 }}>
-          <Ic n="back" sz={14} c="#fff"/> Назад
+        <button onClick={()=>{ if(mergeMode){setMergeMode(false);setMergeSelected([]);} else onBack(); }} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'6px 12px', backgroundColor:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:DS.radius, cursor:'pointer', color:'#fff', fontFamily:DS.font, fontSize:'12px', fontWeight:600 }}>
+          <Ic n="back" sz={14} c="#fff"/> {mergeMode ? 'Отказ' : 'Назад'}
         </button>
-        <span style={{ backgroundColor:'rgba(255,255,255,0.08)', padding:'4px 10px', fontFamily:DS.font, fontSize:'11px', fontWeight:600, color:'rgba(255,255,255,0.5)' }}>{records.length} записа</span>
+        <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+          {mergeMode ? (<>
+            {mergeSelected.length > 0 && (
+              <span style={{ color:'rgba(255,255,255,0.5)', fontSize:'11px', fontFamily:DS.font }}>
+                {mergeSelected.length} избрани
+                {!canMerge && mergeSelected.length >= 2 && <span style={{ color:'#FCD34D', marginLeft:'4px' }}>(различни шаблони!)</span>}
+              </span>
+            )}
+            <button
+              onClick={handleMerge}
+              disabled={!canMerge || merging}
+              style={{ display:'flex', alignItems:'center', gap:'4px', padding:'6px 14px', backgroundColor: canMerge && !merging ? '#1B8A50' : '#6B7D76', border:'none', borderRadius:DS.radius, color:'#fff', fontSize:'12px', fontFamily:DS.font, fontWeight:700, cursor: canMerge && !merging ? 'pointer' : 'not-allowed' }}
+            >
+              {merging
+                ? <><div style={{ width:12, height:12, border:'2px solid rgba(255,255,255,0.3)', borderTop:'2px solid #fff', borderRadius:'50%', animation:'sp 0.6s linear infinite' }}/> Обединяване...</>
+                : `Обедини (${mergeSelected.length})`
+              }
+            </button>
+          </>) : (<>
+            <button onClick={()=>setMergeMode(true)} style={{ display:'flex', alignItems:'center', gap:'4px', padding:'5px 10px', backgroundColor:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:DS.radius, color:'white', fontSize:'11px', fontFamily:DS.font, fontWeight:600, cursor:'pointer' }}>
+              Обедини
+            </button>
+            <span style={{ backgroundColor:'rgba(255,255,255,0.08)', padding:'4px 10px', fontFamily:DS.font, fontSize:'11px', fontWeight:600, color:'rgba(255,255,255,0.5)' }}>{records.length} записа</span>
+          </>)}
+        </div>
       </div>
 
       <div style={{ maxWidth:'1200px', margin:'0 auto', padding:pad, flex:1, width:'100%' }}>
@@ -410,7 +509,7 @@ const UnifiedHistory = ({ department, restaurantId, onBack }) => {
         </div>
 
         <Cd style={{ marginBottom:'12px' }}>
-          <SH icon="filter" title="Филтри" right={<Btn sm icon="x" variant="ghost" onClick={()=>setFilter({startDate:'',endDate:'',type:'all'})}>Изчисти</Btn>}/>
+          <SH icon="filter" title="Филтри" right={<Btn sm icon="x" variant="ghost" onClick={()=>setFilter({startDate:'',endDate:'',type:'all',showMerged:false})}>Изчисти</Btn>}/>
           <div style={{ padding:pad }}>
             <div style={{ display:'grid', gridTemplateColumns:mob?'1fr 1fr':'repeat(3,1fr)', gap:'12px', alignItems:'end' }}>
               <DI label="От дата" type="date" value={filter.startDate} onChange={e=>setFilter({...filter,startDate:e.target.value})}/>
@@ -421,9 +520,29 @@ const UnifiedHistory = ({ department, restaurantId, onBack }) => {
                 <option value="incoming">Само входящ контрол</option>
                 <option value="health">Само здравни книжки</option>
               </DSel>
+              <div style={{ display:'flex', alignItems:'center', gap:'8px', paddingTop:'20px' }}>
+                <input type="checkbox" id="showMerged" checked={filter.showMerged}
+                  onChange={e=>setFilter({...filter, showMerged:e.target.checked})}
+                  style={{ width:'16px', height:'16px', cursor:'pointer', accentColor:DS.color.primary }}/>
+                <label htmlFor="showMerged" style={{ fontFamily:DS.font, fontSize:'12px', color:DS.color.graphiteLight, cursor:'pointer', fontWeight:500 }}>
+                  Покажи обединени
+                </label>
+              </div>
             </div>
           </div>
         </Cd>
+
+        {mergeMode && (
+          <div style={{ padding:'12px 16px', backgroundColor:'#FFFBEB', border:'1px solid #C47F1744', marginBottom:'12px', display:'flex', alignItems:'center', gap:'10px' }}>
+            <Ic n="alert" sz={18} c="#C47F17"/>
+            <div>
+              <span style={{ fontFamily:DS.font, fontSize:'13px', fontWeight:700, color:'#C47F17' }}>Режим на обединяване</span>
+              <p style={{ margin:'2px 0 0', fontFamily:DS.font, fontSize:'12px', color:DS.color.graphiteLight }}>
+                Изберете 2 или повече записа от <strong>един и същи шаблон</strong> за да ги обедините в един. Работи само за чек листи.
+              </p>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <Cd style={{ padding:'40px', textAlign:'center' }}>
@@ -436,39 +555,57 @@ const UnifiedHistory = ({ department, restaurantId, onBack }) => {
             <p style={{ fontFamily:DS.font, fontSize:'14px', color:DS.color.graphiteMuted, margin:0 }}>Няма налични записи</p>
           </Cd>
         ) : (
-          <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
-            {records.map((record, idx) => {
-              const rc = getColor(record);
-              const hovered = hoverId === `${record.type}-${record.id}`;
-              return (
-                <Cd key={`${record.type}-${record.id}`}
-                  onClick={()=>setSelectedRecord(record)}
-                  onMouseEnter={()=>setHoverId(`${record.type}-${record.id}`)}
-                  onMouseLeave={()=>setHoverId(null)}
-                  style={{ cursor:'pointer', transition:'all 0.15s', border:hovered?`2px solid ${rc}`:`1px solid ${DS.color.borderLight}`, transform:hovered?'translateX(5px)':'translateX(0)', boxShadow:hovered?`0 4px 12px ${rc}20`:DS.shadow.sm, animationDelay:`${Math.min(idx*30,300)}ms`, animationFillMode:'both' }}>
-                  <div style={{ padding:'14px 16px', display:'flex', alignItems:'center', gap:'14px' }}>
-                    <div style={{ width:mob?44:52, height:mob?44:52, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', backgroundColor:getBg(record), border:`1px solid ${rc}33` }}>
-                      <Ic n={getIcon(record)} sz={mob?20:24} c={rc}/>
-                    </div>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'10px', marginBottom:'6px', flexWrap:'wrap' }}>
-                        <div>
-                          <h3 style={{ margin:'0 0 2px', fontFamily:DS.font, fontSize:mob?'14px':'15px', fontWeight:700, color:rc }}>{record.display_title}</h3>
-                          {record.display_subtitle && <p style={{ margin:0, fontFamily:DS.font, fontSize:'12px', color:DS.color.graphiteLight }}>{record.display_subtitle}</p>}
+          <>
+            <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
+              {pagedRecords.map((record, idx) => {
+                const rc = getColor(record);
+                const hovered = hoverId === `${record.type}-${record.id}`;
+                const isSelected = mergeSelected.some(r => r.id === record.id);
+                const isMergeable = record.type === 'checklist';
+                return (
+                  <Cd key={`${record.type}-${record.id}`}
+                    onClick={()=>{ if(mergeMode){ if(isMergeable) toggleMergeSelect(record); } else openRecord(record); }}
+                    onMouseEnter={()=>setHoverId(`${record.type}-${record.id}`)}
+                    onMouseLeave={()=>setHoverId(null)}
+                    style={{ cursor:'pointer', transition:'all 0.15s', border: mergeMode && isSelected ? `2px solid #1B8A50` : hovered?`2px solid ${rc}`:`1px solid ${DS.color.borderLight}`, transform:hovered?'translateX(5px)':'translateX(0)', boxShadow: mergeMode && isSelected ? '0 4px 12px rgba(27,138,80,0.2)' : hovered?`0 4px 12px ${rc}20`:DS.shadow.sm, animationDelay:`${Math.min(idx*20,200)}ms`, animationFillMode:'both', opacity: mergeMode && !isMergeable ? 0.5 : 1 }}>
+                    <div style={{ padding:'14px 16px', display:'flex', alignItems:'center', gap:'14px' }}>
+                      {mergeMode && (
+                        <div style={{ width:24, height:24, flexShrink:0, border:`2px solid ${isSelected ? '#1B8A50' : DS.color.borderLight}`, backgroundColor: isSelected ? '#1B8A50' : DS.color.surface, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                          {isSelected && <span style={{ color:'white', fontSize:'14px', lineHeight:1 }}>✓</span>}
                         </div>
-                        <Btn sm icon="eye" variant={record.type==='incoming'?'incoming':record.type==='health'?'health':'primary'}>Преглед</Btn>
+                      )}
+                      <div style={{ width:mob?44:52, height:mob?44:52, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', backgroundColor:getBg(record), border:`1px solid ${rc}33` }}>
+                        <Ic n={getIcon(record)} sz={mob?20:24} c={rc}/>
                       </div>
-                      <div style={{ display:'flex', gap:mob?'8px':'16px', flexWrap:'wrap', fontFamily:DS.font, fontSize:'11px', color:DS.color.graphiteMuted }}>
-                        <span style={{ display:'inline-flex', alignItems:'center', gap:'3px' }}><Ic n="calendar" sz={10} c={DS.color.graphiteMuted}/>{formatDate(record.display_date)}</span>
-                        <span style={{ display:'inline-flex', alignItems:'center', gap:'3px' }}><Ic n="clock" sz={10} c={DS.color.graphiteMuted}/>{record.type==='health' ? new Date(record.updated_at).toLocaleTimeString('bg-BG',{hour:'2-digit',minute:'2-digit'}) : formatTime(record.type==='incoming'?record.created_at:record.submitted_at)}</span>
-                        {record.profiles?.full_name && <span style={{ display:'inline-flex', alignItems:'center', gap:'3px' }}><Ic n="user" sz={10} c={DS.color.graphiteMuted}/>{record.profiles.full_name}</span>}
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'10px', marginBottom:'6px', flexWrap:'wrap' }}>
+                          <div>
+                            <h3 style={{ margin:'0 0 2px', fontFamily:DS.font, fontSize:mob?'14px':'15px', fontWeight:700, color:rc }}>{record.display_title}</h3>
+                            {record.display_subtitle && <p style={{ margin:0, fontFamily:DS.font, fontSize:'12px', color:DS.color.graphiteLight }}>{record.display_subtitle}</p>}
+                          </div>
+                          {!mergeMode && <Btn sm icon="eye" variant={record.type==='incoming'?'incoming':record.type==='health'?'health':'primary'}>Преглед</Btn>}
+                          {mergeMode && isSelected && <span style={{ padding:'3px 8px', backgroundColor:'#E8F5EE', color:'#1B8A50', fontFamily:DS.font, fontSize:'10px', fontWeight:700 }}>ИЗБРАН</span>}
+                          {!mergeMode && record.is_merged && <span style={{ padding:'3px 8px', backgroundColor:DS.color.warningBg, color:DS.color.warning, fontFamily:DS.font, fontSize:'10px', fontWeight:700 }}>ОБЕДИНЕН</span>}
+                        </div>
+                        <div style={{ display:'flex', gap:mob?'8px':'16px', flexWrap:'wrap', fontFamily:DS.font, fontSize:'11px', color:DS.color.graphiteMuted }}>
+                          <span style={{ display:'inline-flex', alignItems:'center', gap:'3px' }}><Ic n="calendar" sz={10} c={DS.color.graphiteMuted}/>{formatDate(record.display_date)}</span>
+                          <span style={{ display:'inline-flex', alignItems:'center', gap:'3px' }}><Ic n="clock" sz={10} c={DS.color.graphiteMuted}/>{record.type==='health' ? new Date(record.updated_at).toLocaleTimeString('bg-BG',{hour:'2-digit',minute:'2-digit'}) : formatTime(record.type==='incoming'?record.created_at:record.submitted_at)}</span>
+                          {record.profiles?.full_name && <span style={{ display:'inline-flex', alignItems:'center', gap:'3px' }}><Ic n="user" sz={10} c={DS.color.graphiteMuted}/>{record.profiles.full_name}</span>}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Cd>
-              );
-            })}
-          </div>
+                  </Cd>
+                );
+              })}
+            </div>
+            {hasMore && (
+              <div style={{ textAlign:'center', marginTop:'12px' }}>
+                <button onClick={()=>setPage(p=>p+1)} style={{ padding:'10px 28px', backgroundColor:DS.color.surfaceAlt, border:`1.5px solid ${DS.color.borderLight}`, cursor:'pointer', fontFamily:DS.font, fontSize:'13px', fontWeight:600, color:DS.color.graphiteMed }}>
+                  Покажи още ({records.length - pagedRecords.length} записа)
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 

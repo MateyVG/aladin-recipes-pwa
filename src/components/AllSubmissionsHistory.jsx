@@ -47,21 +47,67 @@ const AllSubmissionsHistory = ({ restaurantId, onBack }) => {
 
   useEffect(() => { loadFD(); loadSubs() }, [restaurantId, flt])
 
-  const loadFD = async () => { try { const { data: dd } = await supabase.from('departments').select('id,name').eq('restaurant_id', restaurantId).eq('active', true).order('name'); setDepts(dd || []); const { data: td } = await supabase.from('restaurant_templates').select('checklist_templates(id,name)').eq('restaurant_id', restaurantId).eq('enabled', true); setTmpls(td?.map(r => r.checklist_templates).filter((t, i, a) => a.findIndex(x => x.id === t.id) === i) || []) } catch (e) { console.error(e) } }
+  const loadFD = async () => {
+    try {
+      const { data: dd } = await supabase.from('departments').select('id,name').eq('restaurant_id', restaurantId).eq('active', true).order('name')
+      setDepts(dd || [])
+      const { data: td } = await supabase.from('restaurant_templates').select('checklist_templates(id,name)').eq('restaurant_id', restaurantId).eq('enabled', true)
+      setTmpls(td?.map(r => r.checklist_templates).filter((t, i, a) => t && a.findIndex(x => x?.id === t.id) === i) || [])
+    } catch (e) { console.error(e) }
+  }
 
   const loadSubs = async () => {
-    setLd(true); try {
-      let q = supabase.from('checklist_submissions').select('*,checklist_templates(id,name,description,config),departments(id,name),profiles(full_name,email)').eq('restaurant_id', restaurantId).order('submission_date', { ascending: false }).order('submitted_at', { ascending: false })
-      if (flt.startDate) q = q.gte('submission_date', flt.startDate); if (flt.endDate) q = q.lte('submission_date', flt.endDate)
-      if (flt.departmentId) q = q.eq('department_id', flt.departmentId); if (flt.templateId) q = q.eq('template_id', flt.templateId)
-      const { data: cd, error: ce } = await q; if (ce) throw ce
-      let iq = supabase.from('incoming_control_records').select('*,incoming_control_materials(*)').order('control_date', { ascending: false })
-      if (flt.startDate) iq = iq.gte('control_date', flt.startDate); if (flt.endDate) iq = iq.lte('control_date', flt.endDate)
+    setLd(true)
+    try {
+      // Чек листи — без обединените
+      let q = supabase.from('checklist_submissions')
+        .select('*,checklist_templates(id,name,description,config),departments(id,name),profiles(full_name,email)')
+        .eq('restaurant_id', restaurantId)
+        .eq('is_merged', false)
+        .order('submission_date', { ascending: false })
+        .order('submitted_at', { ascending: false })
+      if (flt.startDate) q = q.gte('submission_date', flt.startDate)
+      if (flt.endDate) q = q.lte('submission_date', flt.endDate)
+      if (flt.departmentId) q = q.eq('department_id', flt.departmentId)
+      if (flt.templateId) q = q.eq('template_id', flt.templateId)
+      const { data: cd, error: ce } = await q
+      if (ce) throw ce
+
+      // Входящ контрол — филтриран по ресторант, без supplier
+      let iq = supabase.from('incoming_control_records')
+        .select('*,incoming_control_materials(*)')
+        .eq('restaurant_id', restaurantId)
+        .order('control_date', { ascending: false })
+      if (flt.startDate) iq = iq.gte('control_date', flt.startDate)
+      if (flt.endDate) iq = iq.lte('control_date', flt.endDate)
       const { data: id2, error: ie } = await iq
-      const cr = (cd || []).map(r => ({ ...r, type: 'checklist', display_date: r.submission_date, display_title: r.checklist_templates?.name || 'Checklist', display_department: r.departments?.name || '-' }))
-      const ir = (!ie && id2) ? id2.map(r => ({ ...r, type: 'incoming', display_date: r.control_date, display_title: 'Входящ контрол', display_department: 'Operations' })) : []
+
+      const cr = (cd || []).map(r => ({
+        ...r,
+        type: 'checklist',
+        display_date: r.submission_date,
+        display_title: r.checklist_templates?.name || 'Checklist',
+        display_department: r.departments?.name || '-',
+      }))
+
+      const ir = (!ie && id2) ? id2.map(r => ({
+        ...r,
+        type: 'incoming',
+        display_date: r.control_date,
+        display_title: 'Входящ контрол',
+        display_department: 'Operations',
+        display_subtitle: r.company_name || r.object_name || '',
+      })) : []
+
       let all = [...cr, ...ir].sort((a, b) => new Date(b.display_date) - new Date(a.display_date))
-      if (flt.searchTerm) { const s = flt.searchTerm.toLowerCase(); all = all.filter(x => x.type === 'checklist' ? (x.checklist_templates?.name?.toLowerCase().includes(s) || x.departments?.name?.toLowerCase().includes(s) || x.profiles?.full_name?.toLowerCase().includes(s) || JSON.stringify(x.data).toLowerCase().includes(s)) : (x.display_title.toLowerCase().includes(s) || x.supplier?.toLowerCase().includes(s) || JSON.stringify(x.incoming_control_materials).toLowerCase().includes(s))) }
+
+      if (flt.searchTerm) {
+        const s = flt.searchTerm.toLowerCase()
+        all = all.filter(x => x.type === 'checklist'
+          ? (x.checklist_templates?.name?.toLowerCase().includes(s) || x.departments?.name?.toLowerCase().includes(s) || x.profiles?.full_name?.toLowerCase().includes(s) || JSON.stringify(x.data).toLowerCase().includes(s))
+          : (x.display_title.toLowerCase().includes(s) || x.company_name?.toLowerCase().includes(s) || x.object_name?.toLowerCase().includes(s) || JSON.stringify(x.incoming_control_materials).toLowerCase().includes(s)))
+      }
+
       setSubs(all)
     } catch (e) { console.error(e); alert('Грешка при зареждане') } finally { setLd(false) }
   }
@@ -69,13 +115,24 @@ const AllSubmissionsHistory = ({ restaurantId, onBack }) => {
   const fd = d => new Date(d).toLocaleDateString('bg-BG', { year: 'numeric', month: 'long', day: 'numeric' })
   const fds = d => new Date(d).toLocaleDateString('bg-BG', { day: '2-digit', month: '2-digit' })
   const ft = d => new Date(d).toLocaleTimeString('bg-BG', { hour: '2-digit', minute: '2-digit' })
-  const gs = s => `${s.data?.rows?.length || 0} реда`
+  const gs = s => `${s.data?.rows?.length || s.data?.records?.length || s.data?.productions?.length || s.data?.inventoryItems?.filter(i => i.name)?.length || 0} реда`
 
-  const csv = () => { const c = ['Дата,Час,Отдел,Чек лист,Попълнил,Редове', ...subs.map(s => [s.submission_date, ft(s.submitted_at), s.departments?.name || '', s.checklist_templates?.name || '', s.profiles?.full_name || '', s.data?.rows?.length || 0].map(f => `"${f}"`).join(','))].join('\n'); const b = new Blob(['\uFEFF' + c], { type: 'text/csv;charset=utf-8' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `история_${new Date().toISOString().split('T')[0]}.csv`; a.click(); URL.revokeObjectURL(u) }
+  const csv = () => {
+    const c = ['Дата,Час,Отдел,Чек лист,Попълнил,Редове',
+      ...subs.map(s => [s.display_date, ft(s.type === 'incoming' ? s.created_at : s.submitted_at), s.display_department, s.display_title, s.profiles?.full_name || '', gs(s)].map(f => `"${f}"`).join(','))
+    ].join('\n')
+    const b = new Blob(['\uFEFF' + c], { type: 'text/csv;charset=utf-8' })
+    const u = URL.createObjectURL(b); const a = document.createElement('a')
+    a.href = u; a.download = `история_${new Date().toISOString().split('T')[0]}.csv`; a.click(); URL.revokeObjectURL(u)
+  }
 
-  if (sel) { console.log('Selected:', sel, 'Type:', sel.type); if (sel.type === 'incoming') return <IncomingControlDetail record={sel} onBack={() => setSel(null)} />; return <ImprovedSubmissionDetail submission={sel} onBack={() => setSel(null)} /> }
+  if (sel) {
+    if (sel.type === 'incoming') return <IncomingControlDetail record={sel} onBack={() => setSel(null)} />
+    return <ImprovedSubmissionDetail submission={sel} onBack={() => setSel(null)} />
+  }
 
-  const nC = subs.filter(s => s.type === 'checklist').length, nI = subs.filter(s => s.type === 'incoming').length
+  const nC = subs.filter(s => s.type === 'checklist').length
+  const nI = subs.filter(s => s.type === 'incoming').length
 
   return (<><style>{CSS}</style>
     <div style={{ minHeight: '100vh', backgroundColor: DS.color.bg, fontFamily: DS.font, color: DS.color.graphite, display: 'flex', flexDirection: 'column' }}>
@@ -105,7 +162,7 @@ const AllSubmissionsHistory = ({ restaurantId, onBack }) => {
               <DI label="От дата" type="date" value={flt.startDate} onChange={e => setFlt({ ...flt, startDate: e.target.value })} />
               <DI label="До дата" type="date" value={flt.endDate} onChange={e => setFlt({ ...flt, endDate: e.target.value })} />
               <DSel label="Отдел" value={flt.departmentId} onChange={e => setFlt({ ...flt, departmentId: e.target.value })}><option value="">Всички</option>{depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</DSel>
-              <DSel label="Чек лист" value={flt.templateId} onChange={e => setFlt({ ...flt, templateId: e.target.value })}><option value="">Всички</option>{tmpls.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</DSel>
+              <DSel label="Чек лист" value={flt.templateId} onChange={e => setFlt({ ...flt, templateId: e.target.value })}><option value="">Всички</option>{tmpls.map(t => t && <option key={t.id} value={t.id}>{t.name}</option>)}</DSel>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <DI value={flt.searchTerm} onChange={e => setFlt({ ...flt, searchTerm: e.target.value })} placeholder="Търсене..." style={{ flex: 1 }} />
@@ -114,39 +171,86 @@ const AllSubmissionsHistory = ({ restaurantId, onBack }) => {
           </div>
         </Cd>
 
-        {ld ? (<Cd><div style={{ padding: '40px', textAlign: 'center' }}><div style={{ width: 36, height: 36, border: `3px solid ${DS.color.borderLight}`, borderTop: `3px solid ${DS.color.primary}`, borderRadius: '50%', animation: 'sp 0.8s linear infinite', margin: '0 auto 12px' }} /><p style={{ fontFamily: DS.font, fontSize: '12px', color: DS.color.graphiteLight, margin: 0, fontWeight: 600, textTransform: 'uppercase' }}>Зареждане...</p></div></Cd>
-        ) : subs.length === 0 ? (<Cd><div style={{ padding: '40px', textAlign: 'center' }}><Ic n="cb" sz={48} c={DS.color.graphiteMuted} style={{ margin: '0 auto 12px' }} /><p style={{ fontFamily: DS.font, fontSize: '14px', color: DS.color.graphiteMuted, margin: 0 }}>Няма записи с тези филтри</p></div></Cd>
+        {ld ? (
+          <Cd><div style={{ padding: '40px', textAlign: 'center' }}>
+            <div style={{ width: 36, height: 36, border: `3px solid ${DS.color.borderLight}`, borderTop: `3px solid ${DS.color.primary}`, borderRadius: '50%', animation: 'sp 0.8s linear infinite', margin: '0 auto 12px' }} />
+            <p style={{ fontFamily: DS.font, fontSize: '12px', color: DS.color.graphiteLight, margin: 0, fontWeight: 600, textTransform: 'uppercase' }}>Зареждане...</p>
+          </div></Cd>
+        ) : subs.length === 0 ? (
+          <Cd><div style={{ padding: '40px', textAlign: 'center' }}>
+            <Ic n="cb" sz={48} c={DS.color.graphiteMuted} style={{ margin: '0 auto 12px' }} />
+            <p style={{ fontFamily: DS.font, fontSize: '14px', color: DS.color.graphiteMuted, margin: 0 }}>Няма записи с тези филтри</p>
+          </div></Cd>
         ) : (
           <Cd>
             <SH icon="cb" title={`Записи (${subs.length})`} right={<span style={{ fontFamily: DS.font, fontSize: '10px', color: DS.color.graphiteMuted, fontWeight: 600 }}>{nC} чек листи • {nI} входящи</span>} />
             {!mob ? (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: DS.font, fontSize: '12px' }}>
-                  <thead><tr style={{ backgroundColor: DS.color.cardHeader }}>{['Дата', 'Час', 'Тип', 'Чек лист', 'Попълнил', 'Данни', ''].map(h => <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: '9px', fontWeight: 700, color: DS.color.graphiteMuted, textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: `2px solid ${DS.color.borderLight}` }}>{h}</th>)}</tr></thead>
-                  <tbody>{subs.map((s, i) => { const isI = s.type === 'incoming', bg = isI ? DS.color.incomingBg : (i % 2 === 0 ? DS.color.surface : DS.color.surfaceAlt); return (
-                    <tr key={`${s.type}-${s.id}`} style={{ borderBottom: `1px solid ${DS.color.borderLight}`, backgroundColor: bg, cursor: 'pointer', transition: 'background-color 150ms' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = isI ? '#EDE9FE' : DS.color.okBg} onMouseLeave={e => e.currentTarget.style.backgroundColor = bg} onClick={() => setSel(s)}>
-                      <td style={{ padding: '10px 12px', fontWeight: 500 }}>{fd(s.display_date)}</td>
-                      <td style={{ padding: '10px 12px', color: DS.color.graphiteLight }}>{ft(isI ? s.created_at : s.submitted_at)}</td>
-                      <td style={{ padding: '10px 12px' }}><span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', fontSize: '10px', fontWeight: 700, backgroundColor: isI ? DS.color.incomingBg : DS.color.infoBg, color: isI ? DS.color.incoming : DS.color.info, border: `1px solid ${isI ? DS.color.incoming : DS.color.info}22` }}><Ic n={isI ? 'truck' : 'cb'} sz={10} c={isI ? DS.color.incoming : DS.color.info} />{isI ? 'Входящ' : (s.departments?.name || '—')}</span></td>
-                      <td style={{ padding: '10px 12px', fontWeight: 600, color: isI ? DS.color.incoming : DS.color.primary }}>{s.display_title}</td>
-                      <td style={{ padding: '10px 12px', color: DS.color.graphiteLight }}>{isI ? (s.supplier || '—') : (s.profiles?.full_name || s.profiles?.email || '—')}</td>
-                      <td style={{ padding: '10px 12px', fontSize: '11px', color: DS.color.graphiteMuted }}>{isI ? `${s.incoming_control_materials?.length || 0} мат.` : gs(s)}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center' }}><button onClick={e => { e.stopPropagation(); setSel(s) }} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', backgroundColor: isI ? DS.color.incoming : DS.color.primary, color: '#fff', border: 'none', borderRadius: DS.radius, cursor: 'pointer', fontFamily: DS.font, fontSize: '10px', fontWeight: 700 }}><Ic n="eye" sz={11} c="#fff" />Виж</button></td>
-                    </tr>) })}</tbody>
+                  <thead><tr style={{ backgroundColor: DS.color.cardHeader }}>
+                    {['Дата', 'Час', 'Тип', 'Чек лист', 'Попълнил', 'Данни', ''].map(h => (
+                      <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: '9px', fontWeight: 700, color: DS.color.graphiteMuted, textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: `2px solid ${DS.color.borderLight}` }}>{h}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody>{subs.map((s, i) => {
+                    const isI = s.type === 'incoming'
+                    const bg = isI ? DS.color.incomingBg : (i % 2 === 0 ? DS.color.surface : DS.color.surfaceAlt)
+                    return (
+                      <tr key={`${s.type}-${s.id}`}
+                        style={{ borderBottom: `1px solid ${DS.color.borderLight}`, backgroundColor: bg, cursor: 'pointer', transition: 'background-color 150ms' }}
+                        onMouseEnter={e => e.currentTarget.style.backgroundColor = isI ? '#EDE9FE' : DS.color.okBg}
+                        onMouseLeave={e => e.currentTarget.style.backgroundColor = bg}
+                        onClick={() => setSel(s)}>
+                        <td style={{ padding: '10px 12px', fontWeight: 500 }}>{fd(s.display_date)}</td>
+                        <td style={{ padding: '10px 12px', color: DS.color.graphiteLight }}>{ft(isI ? s.created_at : s.submitted_at)}</td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', fontSize: '10px', fontWeight: 700, backgroundColor: isI ? DS.color.incomingBg : DS.color.infoBg, color: isI ? DS.color.incoming : DS.color.info, border: `1px solid ${isI ? DS.color.incoming : DS.color.info}22` }}>
+                            <Ic n={isI ? 'truck' : 'cb'} sz={10} c={isI ? DS.color.incoming : DS.color.info} />
+                            {isI ? 'Входящ' : (s.departments?.name || '—')}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 12px', fontWeight: 600, color: isI ? DS.color.incoming : DS.color.primary }}>{s.display_title}</td>
+                        <td style={{ padding: '10px 12px', color: DS.color.graphiteLight }}>
+                          {isI ? (s.company_name || s.object_name || '—') : (s.profiles?.full_name || s.profiles?.email || '—')}
+                        </td>
+                        <td style={{ padding: '10px 12px', fontSize: '11px', color: DS.color.graphiteMuted }}>
+                          {isI ? `${s.incoming_control_materials?.length || 0} мат.` : gs(s)}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                          <button onClick={e => { e.stopPropagation(); setSel(s) }} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', backgroundColor: isI ? DS.color.incoming : DS.color.primary, color: '#fff', border: 'none', borderRadius: DS.radius, cursor: 'pointer', fontFamily: DS.font, fontSize: '10px', fontWeight: 700 }}>
+                            <Ic n="eye" sz={11} c="#fff" />Виж
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}</tbody>
                 </table>
               </div>
             ) : (
-              <div style={{ padding: '6px' }}>{subs.map((s, i) => { const isI = s.type === 'incoming'; return (
-                <div key={`${s.type}-${s.id}`} onClick={() => setSel(s)} style={{ padding: '12px', margin: '4px', backgroundColor: isI ? DS.color.incomingBg : (i % 2 === 0 ? DS.color.surface : DS.color.surfaceAlt), border: `1px solid ${DS.color.borderLight}`, cursor: 'pointer', animation: 'cf 0.3s ease', animationDelay: `${Math.min(i * 30, 300)}ms`, animationFillMode: 'both' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <span style={{ fontFamily: DS.font, fontSize: '13px', fontWeight: 700, color: isI ? DS.color.incoming : DS.color.primary, display: 'flex', alignItems: 'center', gap: '6px' }}><Ic n={isI ? 'truck' : 'cb'} sz={14} c={isI ? DS.color.incoming : DS.color.primary} />{s.display_title}</span>
-                    <span style={{ fontFamily: DS.font, fontSize: '10px', fontWeight: 600, padding: '2px 6px', backgroundColor: isI ? DS.color.incomingBg : DS.color.okBg, color: isI ? DS.color.incoming : DS.color.primary }}>{isI ? 'Входящ' : (s.departments?.name || '—')}</span>
+              <div style={{ padding: '6px' }}>{subs.map((s, i) => {
+                const isI = s.type === 'incoming'
+                return (
+                  <div key={`${s.type}-${s.id}`} onClick={() => setSel(s)} style={{ padding: '12px', margin: '4px', backgroundColor: isI ? DS.color.incomingBg : (i % 2 === 0 ? DS.color.surface : DS.color.surfaceAlt), border: `1px solid ${DS.color.borderLight}`, cursor: 'pointer', animation: 'cf 0.3s ease', animationDelay: `${Math.min(i * 30, 300)}ms`, animationFillMode: 'both' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <span style={{ fontFamily: DS.font, fontSize: '13px', fontWeight: 700, color: isI ? DS.color.incoming : DS.color.primary, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Ic n={isI ? 'truck' : 'cb'} sz={14} c={isI ? DS.color.incoming : DS.color.primary} />{s.display_title}
+                      </span>
+                      <span style={{ fontFamily: DS.font, fontSize: '10px', fontWeight: 600, padding: '2px 6px', backgroundColor: isI ? DS.color.incomingBg : DS.color.okBg, color: isI ? DS.color.incoming : DS.color.primary }}>
+                        {isI ? 'Входящ' : (s.departments?.name || '—')}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: DS.font, fontSize: '11px', color: DS.color.graphiteLight }}>
+                      <span>{fds(s.display_date)} • {ft(isI ? s.created_at : s.submitted_at)}</span>
+                      <span style={{ fontWeight: 600 }}>{isI ? `${s.incoming_control_materials?.length || 0} мат.` : gs(s)}</span>
+                    </div>
+                    {isI && (s.company_name || s.object_name) && (
+                      <div style={{ marginTop: '4px', fontFamily: DS.font, fontSize: '11px', color: DS.color.graphiteLight }}>
+                        {s.company_name || s.object_name}
+                      </div>
+                    )}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: DS.font, fontSize: '11px', color: DS.color.graphiteLight }}>
-                    <span>{fds(s.display_date)} • {ft(isI ? s.created_at : s.submitted_at)}</span>
-                    <span style={{ fontWeight: 600 }}>{isI ? `${s.incoming_control_materials?.length || 0} мат.` : gs(s)}</span>
-                  </div>
-                </div>) })}</div>
+                )
+              })}</div>
             )}
           </Cd>
         )}

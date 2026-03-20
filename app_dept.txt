@@ -1,0 +1,165 @@
+﻿
+  import { useNavigationHistory } from './hooks/useNavigationHistory'
+  import { LanguageProvider } from './context/LanguageContext'
+  import { AuthProvider, useAuth } from './contexts/AuthContext'
+  
+  /* в•ђв•ђв•ђ LAZY LOADED COMPONENTS в•ђв•ђв•ђ */
+> const DepartmentView = lazy(() => import('./components/DepartmentView'))
+  const ReportsAdminPanel = lazy(() => import('./components/ReportsAdminPanel'))
+  const NotificationsPanel = lazy(() => import('./components/NotificationsPanel'))
+  const AllSubmissionsHistory = lazy(() => import('./components/AllSubmissionsHistory'))
+  const RecipesManager = lazy(() => import('./components/recipes/RecipesManager'))
+  const IncomingMaterialsControl = lazy(() => import('./components/templates/IncomingMaterialsControl'))
+    const [newRestaurantName, setNewRestaurantName] = useState('')
+    const [templates, setTemplates] = useState([])
+    const [templateName, setTemplateName] = useState('')
+    const [templateDescription, setTemplateDescription] = useState('')
+    const [templateConfig, setTemplateConfig] = useState('')
+>   const [selectedDepartments, setSelectedDepartments] = useState([])
+    const [restaurants, setRestaurants] = useState([])
+    const [selectedRestaurant, setSelectedRestaurant] = useState(null)
+    const [availableTemplates, setAvailableTemplates] = useState([])
+    const [assignedTemplates, setAssignedTemplates] = useState([])
+    const departments = ['Pizza', 'Chicken', 'Doner', 'Operations']
+  
+    const handleCreateManagers = async () => { setLoading(true); setCreationResults([]); const emails = emailList.split('\n').map(e
+ => e.trim()).filter(e => e); const results = []; for (const email of emails) { const pw = generatePassword(); const r = await crea
+teNewManager(email, pw, email.split('@')[0]); results.push({ email, password: pw, success: r.success, message: r.success ? 'РЈСЃРїР
+µС€РЅРѕ СЃСЉР·РґР°РґРµРЅ' : r.error }) }; setCreationResults(results); setLoading(false) }
+    const downloadCSV = () => { const csv = 'Email,Password,Status,Message\n' + creationResults.map(r => `${r.email},${r.password},
+${r.success ? 'Success' : 'Error'},${r.message}`).join('\n'); const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf
+-8' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `managers_${new Da
+te().toISOString().split('T')[0]}.csv`; a.click(); URL.revokeObjectURL(url) }
+    const handleResetPassword = async () => { if (!selectedManager || !newPassword) { alert('РњРѕР»СЏ РёР·Р±РµСЂРё РјРµРЅРёРґР¶СЉСЂ
+ Рё РІСЉРІРµРґРё РЅРѕРІР° РїР°СЂРѕР»Р°'); return }; if (newPassword.length < 6) { alert('РџР°СЂРѕР»Р°С‚Р° С‚СЂСЏР±РІР° РґР° Рµ РїРѕ
+РЅРµ 6 СЃРёРјРІРѕР»Р°'); return }; setLoading(true); const r = await resetManagerPassword(selectedManager.id, newPassword); setLoad
+ing(false); if (r.success) { alert(`РџР°СЂРѕР»Р°С‚Р° РЅР° ${selectedManager.email} Рµ РїСЂРѕРјРµРЅРµРЅР°!\nРќРѕРІР° РїР°СЂРѕР»Р°: $
+{newPassword}`); setNewPassword(''); setSelectedManager(null) } else alert('Р“СЂРµС€РєР°: ' + r.error) }
+    const handleUpdateRestaurantName = async () => { if (!editingRestaurant?.id || !newRestaurantName.trim()) { alert('РњРѕР»СЏ РІС
+ЉРІРµРґРё РёРјРµ'); return }; setLoading(true); try { const { error } = await supabase.from('restaurants').update({ name: newRestau
+rantName.trim() }).eq('id', editingRestaurant.id); if (error) throw error; alert('РРјРµС‚Рѕ Рµ РїСЂРѕРјРµРЅРµРЅРѕ!'); setEditingRe
+staurant(null); setNewRestaurantName(''); loadAllManagers() } catch (e) { alert('Р“СЂРµС€РєР°: ' + e.message) } finally { setLoadin
+g(false) } }
+>   const handleCreateTemplate = async () => { if (!templateName || !templateConfig || selectedDepartments.length === 0) { alert('Р
+њРѕР»СЏ РїРѕРїСЉР»РЅРё РІСЃРёС‡РєРё РїРѕР»РµС‚Р°'); return }; try { const cfg = JSON.parse(templateConfig); setLoading(true); const
+ { data: t, error: e1 } = await supabase.from('checklist_templates').insert({ name: templateName, description: templateDescription,
+ config: cfg, active: true, created_by: (await supabase.auth.getUser()).data.user.id }).select().single(); if (e1) throw e1; const 
+{ error: e2 } = await supabase.from('template_departments').insert(selectedDepartments.map(d => ({ template_id: t.id, department_na
+me: d }))); if (e2) throw e2; alert('Template СЃСЉР·РґР°РґРµРЅ!'); setTemplateName(''); setTemplateDescription(''); setTemplateConf
+ig(''); setSelectedDepartments([]); loadTemplates() } catch (e) { alert('Р“СЂРµС€РєР°: ' + e.message) } finally { setLoading(false)
+ } }
+    const handleAssignTemplate = async (tid) => { if (!selectedRestaurant) return; try { const { error } = await supabase.from('res
+taurant_templates').insert({ restaurant_id: selectedRestaurant.id, template_id: tid, enabled: true, assigned_by: (await supabase.au
+th.getUser()).data.user.id }); if (error) throw error; loadAssignedTemplates(selectedRestaurant.id) } catch (e) { alert('Р“СЂРµС€Рє
+Р°: ' + e.message) } }
+    const handleUnassignTemplate = async (aid) => { try { const { error } = await supabase.from('restaurant_templates').delete().eq
+('id', aid); if (error) throw error; loadAssignedTemplates(selectedRestaurant.id) } catch (e) { alert('Р“СЂРµС€РєР°: ' + e.message)
+ } }
+  
+    const tabs = [{ id: 'managers', label: 'РЎСЉР·РґР°Р№', icon: 'users' }, { id: 'manage', label: 'РЈРїСЂР°РІР»РµРЅРёРµ', icon: 's
+ettings' }, { id: 'templates', label: 'Templates', icon: 'clipboard' }, { id: 'assign', label: 'Р Р°Р·РїСЂРµРґРµР»СЏРЅРµ', icon: 'l
+ink' }]
+  
+                    <DSInput label="РРјРµ РЅР° template" value={templateName} onChange={e => setTemplateName(e.target.value)} plac
+eholder="РљРѕРЅС‚СЂРѕР» РЅР° СЂР°Р±РѕС‚РЅРѕ РѕР±Р»РµРєР»Рѕ" />
+                    <DSInput label="РћРїРёСЃР°РЅРёРµ" value={templateDescription} onChange={e => setTemplateDescription(e.target.va
+lue)} placeholder="РџСЂРѕРІРµСЂРєР° РЅР° С…РёРіРёРµРЅР° Рё РѕР±Р»РµРєР»Рѕ" />
+                    <div>
+                      <label style={{ display: 'block', fontFamily: DS.font, fontSize: '11px', fontWeight: 600, color: DS.color.gra
+phiteLight, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>РћС‚РґРµР»Рё</label>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+>                       {departments.map(d => { const sel = selectedDepartments.includes(d); return <button key={d} onClick={() => 
+setSelectedDepartments(sel ? selectedDepartments.filter(x => x !== d) : [...selectedDepartments, d])} style={{ padding: '6px 14px',
+ backgroundColor: sel ? DS.color.primary : DS.color.surfaceAlt, color: sel ? '#fff' : DS.color.graphiteMed, border: `1.5px solid ${
+sel ? DS.color.primary : DS.color.borderLight}`, borderRadius: DS.radius, cursor: 'pointer', fontFamily: DS.font, fontSize: '12px',
+ fontWeight: 600, transition: 'all 150ms' }}>{sel && 'вњ“ '}{d}</button> })}
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontFamily: DS.font, fontSize: '11px', fontWeight: 600, color: DS.color.gra
+phiteLight, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>JSON Config</label>
+                      <textarea value={templateConfig} onChange={e => setTemplateConfig(e.target.value)} placeholder='{"type":"tabl
+e","columns":[...]}' style={{ ...inputBase(false), minHeight: '160px', resize: 'vertical', fontFamily: "'DM Sans', monospace" }} />
+     в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ
+в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+  const Dashboard = ({ profile, onSignOut }) => {
+    const { isMobile } = useResponsive()
+    const pad = isMobile ? '12px' : '20px'
+    const [currentView, setCurrentView] = useState('dashboard')
+>   const [selectedDepartment, setSelectedDepartment] = useState(null)
+    const [departments, setDepartments] = useState([])
+    const [loading, setLoading] = useState(false)
+    const [showChecklists, setShowChecklists] = useState(false)
+    const [now, setNow] = useState(new Date())
+    const [isOnline, setIsOnline] = useState(navigator.onLine)
+      </div>
+    )
+  
+    if (currentView === 'admin') return <SuperAdminPanel onBack={() => setCurrentView('dashboard')} />
+    if (currentView === 'reports') return <Suspense fallback={<LazyFallback />}><ReportsAdminPanel onBack={() => setCurrentView('da
+shboard')} /></Suspense>
+>   if (currentView === 'notifications') return <Suspense fallback={<LazyFallback />}><NotificationsPanel onBack={() => setCurrentV
+iew('dashboard')} restaurantId={restId} userId={profile?.id} /></Suspense>
+>   if (currentView === 'notification-settings') return <NotificationSettings onBack={() => setCurrentView('dashboard')} restaurant
+Id={restId} />
+>   if (currentView === 'all-history') return <Suspense fallback={<LazyFallback />}><AllSubmissionsHistory restaurantId={restId} on
+Back={() => setCurrentView('dashboard')} /></Suspense>
+    if (currentView === 'recipes') return <Suspense fallback={<LazyFallback />}><RecipesManager onBack={() => setCurrentView('dashb
+oard')} /></Suspense>
+    if (currentView === 'incoming-control') return <Suspense fallback={<LazyFallback />}><IncomingMaterialsControl profile={profile
+} onBack={() => setCurrentView('dashboard')} /></Suspense>
+>   if (showChecklists && selectedDepartment && profile?.role === 'manager') return <Suspense fallback={<LazyFallback />}><Departme
+ntView department={selectedDepartment} restaurantId={restId} onBack={() => { setSelectedDepartment(null); setShowChecklists(false) 
+}} /></Suspense>
+  
+    const roleLabel = profile?.role === 'super_admin' ? 'Super Admin' : profile?.role === 'reports_admin' ? 'Reports Admin' : 'РњРµ
+РЅРёРґР¶СЉСЂ'
+    const quickActions = []
+    if (profile?.role === 'super_admin') quickActions.push({ id: 'admin', label: 'Admin Panel', icon: 'settings', variant: 'primary
+' })
+    if (profile?.role === 'super_admin' || profile?.role === 'reports_admin') quickActions.push({ id: 'reports', label: 'Reports', 
+icon: 'chart', variant: 'info' })
+                </div>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {quickActions.map(a => (
+                    <DSButton key={a.id} onClick={() => setCurrentView(a.id)} variant={a.variant} icon={a.icon} size="sm" style={{ 
+position: 'relative' }}>
+                      {a.label}
+>                     {a.id === 'notifications' && <NotificationBadge restaurantId={restId} />}
+                    </DSButton>
+                  ))}
+                </div>
+              </div>
+            </Card>
+                ))}
+              </div>
+            )}
+  
+            {/* в•ђв•ђв•ђ DEPARTMENTS GRID в•ђв•ђв•ђ */}
+>           {profile?.role === 'manager' && showChecklists && !selectedDepartment && (
+              <>
+                <Card style={{ marginBottom: '12px' }}>
+                  <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <DSButton onClick={() => setShowChecklists(false)} variant="ghost" icon="back" size="sm">РќР°Р·Р°Рґ</DSButton>
+                    <span style={{ fontFamily: DS.font, fontSize: '12px', fontWeight: 600, color: DS.color.graphiteMuted, textTrans
+form: 'uppercase', letterSpacing: '0.04em' }}>РР·Р±РµСЂРё РѕС‚РґРµР»</span>
+                    <div style={{ gridColumn: '1 / -1', padding: '40px', textAlign: 'center' }}>
+                      <p style={{ fontFamily: DS.font, fontSize: '13px', color: DS.color.graphiteMuted }}>РќСЏРјР° РЅР°РјРµСЂРµРЅРё
+ РѕС‚РґРµР»Рё</p>
+                    </div>
+                  ) : departments.map(dept => (
+                    <Card key={dept.id} style={{ cursor: 'pointer', transition: 'all 200ms' }}>
+>                     <div onClick={() => setSelectedDepartment(dept)} style={{ padding: isMobile ? '20px 12px' : '24px 16px', text
+Align: 'center' }}
+                        onMouseEnter={e => { e.currentTarget.parentElement.style.boxShadow = DS.shadow.glow; e.currentTarget.parent
+Element.style.borderColor = DS.color.primary }}
+                        onMouseLeave={e => { e.currentTarget.parentElement.style.boxShadow = DS.shadow.sm; e.currentTarget.parentEl
+ement.style.borderColor = DS.color.borderLight }}>
+                        {dept.icon ? <img src={dept.icon} alt={dept.name} style={{ width: '48px', height: '48px', objectFit: 'conta
+in', marginBottom: '8px' }} /> : <div style={{ fontSize: '36px', marginBottom: '8px', lineHeight: 1 }}>рџ“‹</div>}
+                        <h3 style={{ margin: '0 0 8px', fontSize: '15px', fontWeight: 700, color: DS.color.primary, fontFamily: DS.
+font, textTransform: 'uppercase' }}>{dept.name}</h3>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 14px', backgroundCol
+or: DS.color.primary, color: '#fff', fontFamily: DS.font, fontSize: '11px', fontWeight: 600 }}>
+
+

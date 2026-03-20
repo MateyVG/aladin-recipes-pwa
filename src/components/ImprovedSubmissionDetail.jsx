@@ -17,7 +17,7 @@ const DS = {
   shadow: { sm: '0 1px 3px rgba(30,42,38,0.06),0 1px 2px rgba(30,42,38,0.04)' },
 };
 const LOGO = 'https://aladinfoods.bg/assets/images/aladinfoods_logo.png';
-const DSS = `@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');*,*::before,*::after{box-sizing:border-box}body{margin:0;background:${DS.color.bg}}@keyframes cf{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}@media(max-width:767px){input,button,select,textarea{font-size:16px!important}}`;
+const DSS = `@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');*,*::before,*::after{box-sizing:border-box}body{margin:0;background:${DS.color.bg}}@keyframes cf{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}@media(max-width:767px){input,button,select,textarea{font-size:16px!important}}@media print{.no-print{display:none!important}body{background:white!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{size:A4;margin:12mm}}`;
 
 /* ═══ DS INLINE ICONS ═══ */
 const Ic = ({ n, sz = 16, c = 'currentColor', style: s }) => {
@@ -26,6 +26,7 @@ const Ic = ({ n, sz = 16, c = 'currentColor', style: s }) => {
     edit: <><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" fill="none" stroke={c} strokeWidth="2"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" fill="none" stroke={c} strokeWidth="2"/></>,
     save: <><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"/><polyline points="17 21 17 13 7 13 7 21" fill="none" stroke={c} strokeWidth="2"/><polyline points="7 3 7 8 15 8" fill="none" stroke={c} strokeWidth="2"/></>,
     x: <><line x1="18" y1="6" x2="6" y2="18" stroke={c} strokeWidth="2" strokeLinecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke={c} strokeWidth="2" strokeLinecap="round"/></>,
+    print: <><polyline points="6 9 6 2 18 2 18 9" fill="none" stroke={c} strokeWidth="2"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2" fill="none" stroke={c} strokeWidth="2"/><rect x="6" y="14" width="12" height="8" fill="none" stroke={c} strokeWidth="2"/></>,
     history: <><circle cx="12" cy="12" r="10" fill="none" stroke={c} strokeWidth="2"/><polyline points="12 6 12 12 16 14" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>,
     alert: <><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" fill="none" stroke={c} strokeWidth="2"/><line x1="12" y1="9" x2="12" y2="13" stroke={c} strokeWidth="2" strokeLinecap="round"/><line x1="12" y1="17" x2="12.01" y2="17" stroke={c} strokeWidth="2" strokeLinecap="round"/></>,
   };
@@ -40,12 +41,10 @@ const TD = { padding: '8px', border: `1px solid ${DS.color.borderLight}`, fontFa
 const ZEBRA = (i) => ({ backgroundColor: i % 2 === 0 ? DS.color.surface : DS.color.surfaceAlt });
 const TBDR = `1px solid ${DS.color.borderLight}`;
 
-
 const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => {
   const mob = useR();
   const pad = mob ? '12px' : '20px';
 
-  // === ALL STATE — UNCHANGED ===
   const [editMode, setEditMode] = useState(false);
   const [submission, setSubmission] = useState(initialSubmission);
   const [corrections, setCorrections] = useState([]);
@@ -57,7 +56,6 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
   const config = submission.checklist_templates?.config || {};
   const cType = submission.checklist_type || submission.checklist_templates?.component_name || '';
 
-  // === EDIT HELPERS — ALL UNCHANGED ===
   useEffect(() => { loadCorrectionsHistory(); }, [submission.id]);
 
   const loadCorrectionsHistory = async () => {
@@ -95,7 +93,6 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
     });
   }, []);
 
-  // === EC (EditableCell) — LOGIC UNCHANGED, only input styling updated ===
   const EC = ({ path, style, children }) => {
     const deepGetVal = (obj, p) => {
       const parts = p.split('.');
@@ -130,7 +127,6 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
     );
   };
 
-  // === findAllChanges — UNCHANGED ===
   const findAllChanges = (oldObj, newObj, prefix = '') => {
     const changes = [];
     const allKeys = new Set([...Object.keys(oldObj || {}), ...Object.keys(newObj || {})]);
@@ -152,7 +148,6 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
     return changes;
   };
 
-  // === handleSave — UNCHANGED ===
   const handleSave = async () => {
     const latestData = editedDataRef.current || editedData;
     if (!latestData) { setEditMode(false); return; }
@@ -179,28 +174,108 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
   const startEdit = () => { const copy = JSON.parse(JSON.stringify(submission.data || {})); editedDataRef.current = copy; setEditedData(copy); setEditMode(true); };
   const formatCorrectionDate = (dateString) => { if (!dateString) return '-'; return new Date(dateString).toLocaleString('bg-BG', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }); };
 
-  console.log('=== SUBMISSION DEBUG ===');
-  console.log('Template name:', submission.checklist_templates?.name);
-  console.log('Full data object:', data);
-  console.log('Data keys:', Object.keys(data));
-  if (data.dateBlocks) { console.log('dateBlocks:', data.dateBlocks); data.dateBlocks.forEach((block, idx) => { console.log(`Block ${idx}:`, block); console.log(`Block ${idx} readings:`, block.readings); }); }
-  console.log('========================');
+  const handlePrint = () => window.print();
 
-
-  // ═══ SECTION HEADER helper ═══
   const SecH = ({ title }) => <h3 style={{ margin: '0 0 12px', fontFamily: DS.font, fontSize: '15px', fontWeight: 700, color: DS.color.primary, textTransform: 'uppercase', letterSpacing: '0.02em' }}>{title}</h3>;
   const InfoBox = ({ children }) => <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: DS.color.okBg, border: `1px solid ${DS.color.ok}33`, fontFamily: DS.font, fontSize: '13px', color: DS.color.graphiteMed }}>{children}</div>;
 
   // ============================================
-  // 🍕 PIZZA TEMPERATURE TABLE — logic UNCHANGED
+  // ALL RENDER FUNCTIONS — UNCHANGED
   // ============================================
+
+  // ─── НОВ ФОРМАТ: PizzaTemperatureControl записва data.records ───
+  const renderPizzaRecords = () => {
+    if (!data.records || !Array.isArray(data.records)) return null;
+    // Само ако записите имат pizza/time/temp структура
+    if (!data.records.some(r => r.pizza !== undefined && r.temp !== undefined)) return null;
+
+    const records = data.records;
+    const minTemp = 85, maxTemp = 95;
+
+    // Групирай по вид пица за обобщение
+    const byPizza = {};
+    records.forEach(r => {
+      if (!byPizza[r.pizza]) byPizza[r.pizza] = { count: 0, temps: [] };
+      byPizza[r.pizza].count += (r.count || 1);
+      byPizza[r.pizza].temps.push(r.temp);
+    });
+
+    const totalPizzas = records.reduce((s, r) => s + (r.count || 1), 0);
+
+    return (
+      <div style={{ marginTop: '24px' }}>
+        <SecH title="Температурен контрол — Пици" />
+
+        {data.date && <InfoBox>
+          <strong>Дата:</strong> {new Date(data.date).toLocaleDateString('bg-BG')}
+          <span style={{ marginLeft: '24px' }}><strong>Общо пици:</strong> {totalPizzas}</span>
+          <span style={{ marginLeft: '24px' }}><strong>Записи:</strong> {records.length}</span>
+        </InfoBox>}
+
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', border: TBDR, fontFamily: DS.font, fontSize: '12px' }}>
+            <thead><tr style={THR}>
+              <th style={{ ...TH, textAlign: 'left' }}>Вид пица</th>
+              <th style={TH}>Час</th>
+              <th style={TH}>Температура</th>
+              <th style={TH}>Брой</th>
+              <th style={TH}>Статус</th>
+            </tr></thead>
+            <tbody>
+              {records.sort((a, b) => (a.time || '').localeCompare(b.time || '')).map((rec, idx) => {
+                const inRange = rec.temp >= minTemp && rec.temp <= maxTemp;
+                return (
+                  <tr key={rec.id || idx} style={ZEBRA(idx)}>
+                    <td style={{ ...TD, fontWeight: 600 }}>{rec.pizza || '-'}</td>
+                    <td style={{ ...TD, textAlign: 'center', fontWeight: 700 }}>{rec.time || '-'}</td>
+                    <td style={{ ...TD, textAlign: 'center', fontWeight: 700, color: inRange ? DS.color.ok : DS.color.danger, backgroundColor: inRange ? DS.color.okBg : DS.color.dangerBg }}>
+                      {rec.temp}°C
+                    </td>
+                    <td style={{ ...TD, textAlign: 'center' }}>{rec.count || 1}</td>
+                    <td style={{ ...TD, textAlign: 'center' }}>
+                      <span style={{ padding: '2px 8px', backgroundColor: inRange ? DS.color.okBg : DS.color.dangerBg, color: inRange ? DS.color.ok : DS.color.danger, fontFamily: DS.font, fontSize: '10px', fontWeight: 700 }}>
+                        {inRange ? 'В норма' : 'Извън норма'}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Обобщение по вид пица */}
+        <div style={{ marginTop: '16px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          {Object.entries(byPizza).map(([pizza, info]) => {
+            const avg = Math.round(info.temps.reduce((s, t) => s + t, 0) / info.temps.length);
+            const inRange = avg >= minTemp && avg <= maxTemp;
+            return (
+              <div key={pizza} style={{ padding: '8px 12px', backgroundColor: DS.color.surfaceAlt, border: `1px solid ${DS.color.borderLight}` }}>
+                <div style={{ fontFamily: DS.font, fontSize: '11px', fontWeight: 700, color: DS.color.primary, marginBottom: '2px' }}>{pizza}</div>
+                <div style={{ fontFamily: DS.font, fontSize: '13px', fontWeight: 700, color: DS.color.graphite }}>
+                  {info.count} бр.
+                  <span style={{ marginLeft: '8px', fontSize: '11px', color: inRange ? DS.color.ok : DS.color.danger }}>⌀ {avg}°C</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ marginTop: '12px', padding: '10px', backgroundColor: DS.color.infoBg, fontFamily: DS.font, fontSize: '11px', display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+          <strong>Норма:</strong>
+          <span style={{ padding: '2px 8px', backgroundColor: DS.color.okBg, color: DS.color.ok, fontWeight: 600 }}>85–95°C</span>
+          <span style={{ padding: '2px 8px', backgroundColor: DS.color.dangerBg, color: DS.color.danger, fontWeight: 600 }}>Извън 85–95°C</span>
+        </div>
+      </div>
+    );
+  };
+
   const renderPizzaTable = () => {
     const pizzaTypes = config.pizza_types || [];
     const timeSlots = config.time_slots || [];
     if (pizzaTypes.length === 0) return null;
     const temperatures = data.temperatures || {};
     const pizzaCounts = data.pizzaCounts || {};
-
     return (
       <div style={{ marginTop: '24px' }}>
         <SecH title="Контрол на температура на пици" />
@@ -249,9 +324,6 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
     );
   };
 
-  // ============================================
-  // 🐔 CHICKEN PRODUCTION — logic UNCHANGED
-  // ============================================
   const renderChickenProduction = () => {
     if (!data.productions) return null;
     const productions = data.productions;
@@ -259,7 +331,6 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
     if (!hasSections) return null;
     const sectionNames = { 'file': 'Филе', 'bonFile': 'Бон Филе', 'wings': 'Крилца', 'rice': 'Ориз' };
     const sections = Object.keys(productions).filter(key => Array.isArray(productions[key]));
-
     return (
       <div style={{ marginTop: '24px' }}>
         {data.currentDate && <InfoBox><strong>Дата:</strong> {new Date(data.currentDate).toLocaleDateString('bg-BG')}{data.manager && <span style={{ marginLeft: '24px' }}><strong>Управител:</strong> {data.manager}</span>}</InfoBox>}
@@ -308,9 +379,6 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
       </div>);
   };
 
-  // ============================================
-  // 🥙 DONER — logic UNCHANGED
-  // ============================================
   const renderDonerProduction = () => {
     if (!data.productions || !Array.isArray(data.productions)) return null;
     const isDoner = data.productions.some(p => p.deliveryDateTime !== undefined || p.weight !== undefined || p.finishDateTime !== undefined);
@@ -343,9 +411,6 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
       </div>);
   };
 
-  // ============================================
-  // 🍖 MEATBALL — logic UNCHANGED
-  // ============================================
   const renderMeatballProduction = () => {
     if (!data.productions || !Array.isArray(data.productions)) return null;
     const isMeatball = data.productions.some(p => (p.dateTime !== undefined || p.type !== undefined) && !p.deliveryDateTime && !p.weight);
@@ -355,7 +420,7 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
     return (
       <div style={{ marginTop: '24px' }}>
         {data.currentDate && <InfoBox><strong>Дата:</strong> {new Date(data.currentDate).toLocaleDateString('bg-BG')}{data.manager && <span style={{ marginLeft: '24px' }}><strong>Управител:</strong> {data.manager}</span>}</InfoBox>}
-        <SecH title="Производствен лист за пилешко кюфте" />
+        <SecH title="Производствен лист за кюфте" />
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', border: TBDR, fontFamily: DS.font, fontSize: '12px' }}>
             <thead><tr style={THR}>
@@ -377,21 +442,34 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
       </div>);
   };
 
-
-  // ============================================
-  // 🍽️ PORTION AND DEFECT — logic UNCHANGED
-  // ============================================
   const renderPortionAndDefect = () => {
-    if (!data.summary) return null;
-    const summary = data.summary; const totals = data.totals || {};
-    const allConsumption = (summary.allConsumption || []).filter(item => item.name && item.name.trim() !== '');
-    const allDefective = (summary.allDefective || []).filter(item => item.name && item.name.trim() !== '');
+    // RestaurantInventoryForm записва inventoryItems и defectiveItems директно в data
+    // По-старият формат използва summary.allConsumption / summary.allDefective
+    const hasInventory = data.inventoryItems || data.defectiveItems;
+    const hasSummary = data.summary;
+    if (!hasInventory && !hasSummary) return null;
+
+    const summary = data.summary || {};
+    const totals = data.totals || {};
+
+    // Поддръжка на двата формата
+    const allConsumption = hasInventory
+      ? (data.inventoryItems || []).filter(item => item.name || item.portion || item.price || item.employeeName)
+      : (summary.allConsumption || []).filter(item => item.name && item.name.trim() !== '');
+
+    const allDefective = hasInventory
+      ? (data.defectiveItems || []).filter(item => item.name || item.quantity || item.reason || item.brakedBy)
+      : (summary.allDefective || []).filter(item => item.name && item.name.trim() !== '');
+
+    const consumptionPath = hasInventory ? 'inventoryItems' : 'summary.allConsumption';
+    const defectivePath = hasInventory ? 'defectiveItems' : 'summary.allDefective';
     return (
       <div style={{ marginTop: '24px' }}>
         <div style={{ marginBottom: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px' }}>
           {data.date && <InfoBox><strong>Дата:</strong> {new Date(data.date).toLocaleDateString('bg-BG')}</InfoBox>}
-          {data.shift && <InfoBox><strong>Смяна:</strong> {data.shift}</InfoBox>}
-          {data.manager && <InfoBox><strong>Управител:</strong> {data.manager}</InfoBox>}
+          {(data.shift || data.shift2) && <InfoBox><strong>Смяна:</strong> {data.shift}{data.shift2 ? ` / ${data.shift2}` : ''}</InfoBox>}
+          {(data.manager || data.managerName) && <InfoBox><strong>Управител:</strong> {data.manager || data.managerName}</InfoBox>}
+          {data.protocolNumber && <InfoBox><strong>Протокол №:</strong> {data.protocolNumber}</InfoBox>}
           {totals.inventory && <div style={{ padding: '12px', backgroundColor: DS.color.warningBg, border: `1px solid ${DS.color.warning}33`, fontFamily: DS.font, fontSize: '13px' }}><strong>Обща стойност:</strong> {totals.inventory} лв.</div>}
         </div>
         {allConsumption.length > 0 && (
@@ -400,13 +478,15 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', border: TBDR, fontFamily: DS.font, fontSize: '13px' }}>
                 <thead><tr style={THR}><th style={{ ...TH, textAlign: 'left' }}>№</th><th style={{ ...TH, textAlign: 'left' }}>Наименование</th><th style={TH}>Брой порции</th><th style={{ ...TH, textAlign: 'right' }}>Цена (лв)</th><th style={{ ...TH, textAlign: 'left' }}>Служител</th></tr></thead>
-                <tbody>{allConsumption.map((item, idx) => { const origIdx = (summary.allConsumption || []).indexOf(item); const ri = origIdx >= 0 ? origIdx : idx;
+                <tbody>{allConsumption.map((item, idx) => {
+                  const srcArr = hasInventory ? (data.inventoryItems||[]) : (summary.allConsumption||[]);
+                  const origIdx = srcArr.indexOf(item); const ri = origIdx >= 0 ? origIdx : idx;
                   return (<tr key={idx} style={ZEBRA(idx)}>
                     <td style={{ ...TD, textAlign: 'center', fontWeight: 700 }}>{idx + 1}</td>
-                    <EC path={`summary.allConsumption.${ri}.name`} style={TD}>{item.name || '-'}</EC>
-                    <EC path={`summary.allConsumption.${ri}.portion`} style={{ ...TD, textAlign: 'center' }}>{item.portion || '-'}</EC>
-                    <EC path={`summary.allConsumption.${ri}.price`} style={{ ...TD, textAlign: 'right' }}>{item.price || '-'}</EC>
-                    <EC path={`summary.allConsumption.${ri}.employeeName`} style={TD}>{item.employeeName || '-'}</EC>
+                    <EC path={`${consumptionPath}.${ri}.name`} style={TD}>{item.name || '-'}</EC>
+                    <EC path={`${consumptionPath}.${ri}.portion`} style={{ ...TD, textAlign: 'center' }}>{item.portion || '-'}</EC>
+                    <EC path={`${consumptionPath}.${ri}.price`} style={{ ...TD, textAlign: 'right' }}>{item.price || '-'}</EC>
+                    <EC path={`${consumptionPath}.${ri}.employeeName`} style={TD}>{item.employeeName || '-'}</EC>
                   </tr>); })}</tbody>
               </table>
             </div>
@@ -417,30 +497,32 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', border: `1px solid ${DS.color.danger}44`, fontFamily: DS.font, fontSize: '13px' }}>
                 <thead><tr style={{ backgroundColor: DS.color.dangerBg }}><th style={{ ...TH, color: DS.color.danger, textAlign: 'left' }}>№</th><th style={{ ...TH, color: DS.color.danger, textAlign: 'left' }}>Наименование</th><th style={{ ...TH, color: DS.color.danger }}>Количество</th><th style={{ ...TH, color: DS.color.danger }}>Мярка</th><th style={{ ...TH, color: DS.color.danger, textAlign: 'left' }}>Причина</th><th style={{ ...TH, color: DS.color.danger, textAlign: 'left' }}>Бракувал</th></tr></thead>
-                <tbody>{allDefective.map((item, idx) => { const origIdx = (summary.allDefective || []).indexOf(item); const ri = origIdx >= 0 ? origIdx : idx;
+                <tbody>{allDefective.map((item, idx) => {
+                  const srcArr = hasInventory ? (data.defectiveItems||[]) : (summary.allDefective||[]);
+                  const origIdx = srcArr.indexOf(item); const ri = origIdx >= 0 ? origIdx : idx;
                   return (<tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? DS.color.surface : DS.color.dangerBg }}>
                     <td style={{ ...TD, textAlign: 'center', fontWeight: 700 }}>{idx + 1}</td>
-                    <EC path={`summary.allDefective.${ri}.name`} style={TD}>{item.name || '-'}</EC>
-                    <EC path={`summary.allDefective.${ri}.quantity`} style={{ ...TD, textAlign: 'center' }}>{item.quantity || '-'}</EC>
-                    <EC path={`summary.allDefective.${ri}.unit`} style={{ ...TD, textAlign: 'center' }}>{item.unit || '-'}</EC>
-                    <EC path={`summary.allDefective.${ri}.reason`} style={TD}>{item.reason || '-'}</EC>
-                    <EC path={`summary.allDefective.${ri}.brakedBy`} style={TD}>{item.brakedBy || '-'}</EC>
+                    <EC path={`${defectivePath}.${ri}.name`} style={TD}>{item.name || '-'}</EC>
+                    <EC path={`${defectivePath}.${ri}.quantity`} style={{ ...TD, textAlign: 'center' }}>{item.quantity || '-'}</EC>
+                    <EC path={`${defectivePath}.${ri}.unit`} style={{ ...TD, textAlign: 'center' }}>{item.unit || '-'}</EC>
+                    <EC path={`${defectivePath}.${ri}.reason`} style={TD}>{item.reason || '-'}</EC>
+                    <EC path={`${defectivePath}.${ri}.brakedBy`} style={TD}>{item.brakedBy || '-'}</EC>
                   </tr>); })}</tbody>
               </table>
             </div>
           </div>)}
-        {allConsumption.length === 0 && allDefective.length === 0 && <div style={{ padding: '20px', textAlign: 'center', color: DS.color.graphiteMuted, backgroundColor: DS.color.surfaceAlt, fontFamily: DS.font }}>Няма записана консумация или брак</div>}
+        {allConsumption.length === 0 && allDefective.length === 0 && (
+          <div style={{ padding: '20px', textAlign: 'center', color: DS.color.graphiteMuted, backgroundColor: DS.color.surfaceAlt, fontFamily: DS.font }}>
+            Няма записана консумация или брак
+          </div>
+        )}
       </div>);
   };
 
-  // ============================================
-  // 🛢️ OIL CHANGE — logic UNCHANGED
-  // ============================================
   const renderOilChangeRecords = () => {
     if (!data.records || data.records.length === 0) return null;
     if (cType === 'transport_hygiene' || cType === 'TransportHygieneChecklist') return null;
     if (cType === 'thermal_processing' || cType === 'ThermalProcessingSheet') return null;
-    // Skip if data has transport-specific fields
     if (data.thermalBags) return null;
     if (data.records.some(r => r.regNumber !== undefined || r.vehicleType !== undefined || r.hygieneStatus !== undefined)) return null;
     if (data.records.some(r => r.degree !== undefined)) return null;
@@ -466,9 +548,6 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
       </div>);
   };
 
-  // ============================================
-  // 🚛 TRANSPORT HYGIENE — NEW
-  // ============================================
   const renderTransportHygiene = () => {
     if (!data.records || data.records.length === 0) return null;
     const isTransport = cType === 'transport_hygiene' || cType === 'TransportHygieneChecklist'
@@ -477,14 +556,12 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
     if (cType === 'thermal_processing' || cType === 'ThermalProcessingSheet') return null;
     const filledRecords = data.records.filter(r => r.date || r.regNumber || r.driverName || r.hygieneStatus);
     if (filledRecords.length === 0) return null;
-
     const getStatusColor = (status) => {
       if (status === 'добро') return { color: DS.color.ok, bg: DS.color.okBg };
       if (status === 'задоволително') return { color: DS.color.warning, bg: DS.color.warningBg };
       if (status === 'лошо') return { color: DS.color.danger, bg: DS.color.dangerBg };
       return { color: DS.color.graphiteMuted, bg: DS.color.surfaceAlt };
     };
-
     return (
       <div style={{ marginTop: '24px' }}>
         <SecH title="Чек лист хигиена на транспортните средства" />
@@ -492,19 +569,13 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', border: TBDR, fontFamily: DS.font, fontSize: '12px' }}>
             <thead><tr style={THR}>
-              <th style={TH}>№</th>
-              <th style={TH}>Дата/Час</th>
-              <th style={TH}>Рег № КАТ</th>
-              <th style={TH}>Вид на ТС</th>
-              <th style={{ ...TH, textAlign: 'left' }}>Шофьор</th>
-              <th style={TH}>Хигиенно състояние</th>
-              <th style={{ ...TH, textAlign: 'left' }}>Коригиращи действия</th>
-              <th style={{ ...TH, textAlign: 'left' }}>Проверяващ</th>
+              <th style={TH}>№</th><th style={TH}>Дата/Час</th><th style={TH}>Рег № КАТ</th><th style={TH}>Вид на ТС</th>
+              <th style={{ ...TH, textAlign: 'left' }}>Шофьор</th><th style={TH}>Хигиенно състояние</th>
+              <th style={{ ...TH, textAlign: 'left' }}>Коригиращи действия</th><th style={{ ...TH, textAlign: 'left' }}>Проверяващ</th>
             </tr></thead>
             <tbody>
               {filledRecords.map((record, idx) => {
-                const origIdx = (data.records || []).indexOf(record);
-                const ri = origIdx >= 0 ? origIdx : idx;
+                const origIdx = (data.records || []).indexOf(record); const ri = origIdx >= 0 ? origIdx : idx;
                 const sc = getStatusColor(record.hygieneStatus);
                 return (
                   <tr key={idx} style={ZEBRA(idx)}>
@@ -520,20 +591,11 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
                     </td>
                     <EC path={`records.${ri}.correctiveActions`} style={TD}>{record.correctiveActions || '-'}</EC>
                     <EC path={`records.${ri}.inspector`} style={TD}>{record.inspector || '-'}</EC>
-                  </tr>
-                );
+                  </tr>);
               })}
             </tbody>
           </table>
         </div>
-        <div style={{ marginTop: '10px', padding: '8px', backgroundColor: DS.color.infoBg, fontFamily: DS.font, fontSize: '11px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          <strong>Легенда:</strong>
-          <span style={{ padding: '2px 8px', backgroundColor: DS.color.okBg, color: DS.color.ok, fontWeight: 600 }}>Добро</span>
-          <span style={{ padding: '2px 8px', backgroundColor: DS.color.warningBg, color: DS.color.warning, fontWeight: 600 }}>Задоволително</span>
-          <span style={{ padding: '2px 8px', backgroundColor: DS.color.dangerBg, color: DS.color.danger, fontWeight: 600 }}>Лошо</span>
-        </div>
-
-        {/* Термочанти за доставка */}
         {data.thermalBags && data.thermalBags.length > 0 && (() => {
           const filledBags = data.thermalBags.filter(b => b.bagName || b.hygieneStatus);
           if (filledBags.length === 0) return null;
@@ -543,16 +605,12 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', border: TBDR, fontFamily: DS.font, fontSize: '12px' }}>
                   <thead><tr style={THR}>
-                    <th style={TH}>№</th>
-                    <th style={{ ...TH, textAlign: 'left' }}>Термочанта</th>
-                    <th style={TH}>Хигиенно състояние</th>
-                    <th style={{ ...TH, textAlign: 'left' }}>Коригиращи действия</th>
-                    <th style={{ ...TH, textAlign: 'left' }}>Проверяващ</th>
+                    <th style={TH}>№</th><th style={{ ...TH, textAlign: 'left' }}>Термочанта</th>
+                    <th style={TH}>Хигиенно състояние</th><th style={{ ...TH, textAlign: 'left' }}>Коригиращи действия</th><th style={{ ...TH, textAlign: 'left' }}>Проверяващ</th>
                   </tr></thead>
                   <tbody>
                     {filledBags.map((bag, idx) => {
-                      const origIdx = (data.thermalBags || []).indexOf(bag);
-                      const bi = origIdx >= 0 ? origIdx : idx;
+                      const origIdx = (data.thermalBags || []).indexOf(bag); const bi = origIdx >= 0 ? origIdx : idx;
                       const sc = getStatusColor(bag.hygieneStatus);
                       return (
                         <tr key={idx} style={ZEBRA(idx)}>
@@ -563,63 +621,42 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
                           </td>
                           <EC path={`thermalBags.${bi}.correctiveActions`} style={TD}>{bag.correctiveActions || '-'}</EC>
                           <EC path={`thermalBags.${bi}.inspector`} style={TD}>{bag.inspector || '-'}</EC>
-                        </tr>
-                      );
+                        </tr>);
                     })}
                   </tbody>
                 </table>
               </div>
-            </div>
-          );
+            </div>);
         })()}
-      </div>
-    );
+      </div>);
   };
 
-  // ============================================
-  // 🔥 THERMAL PROCESSING — NEW
-  // ============================================
   const renderThermalProcessing = () => {
     if (!data.records || data.records.length === 0) return null;
-    const isThermal = cType === 'thermal_processing' || cType === 'ThermalProcessingSheet'
-      || data.records.some(r => r.degree !== undefined);
+    const isThermal = cType === 'thermal_processing' || cType === 'ThermalProcessingSheet' || data.records.some(r => r.degree !== undefined);
     if (!isThermal) return null;
     if (cType === 'transport_hygiene' || cType === 'TransportHygieneChecklist') return null;
     const filledRecords = data.records.filter(r => r.date || r.quantity || r.degree || r.batchL);
     if (filledRecords.length === 0) return null;
-
     const DEGREES = {
       'A': { label: 'A — Леко изпържване', color: DS.color.ok, bg: DS.color.okBg },
       'B': { label: 'B — Средно изпържване', color: DS.color.info, bg: DS.color.infoBg },
       'C': { label: 'C — Силно изпържване', color: DS.color.warning, bg: DS.color.warningBg },
       'D': { label: 'D — Препържено', color: DS.color.danger, bg: DS.color.dangerBg },
     };
-
     return (
       <div style={{ marginTop: '24px' }}>
         <SecH title="Производствен лист — Термична обработка" />
         <InfoBox><strong>Код:</strong> НСL 02 • Редакция: 00</InfoBox>
-        <div style={{ marginBottom: '12px', padding: '10px', backgroundColor: DS.color.infoBg, border: `1px solid ${DS.color.info}22`, display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <strong style={{ fontFamily: DS.font, fontSize: '11px' }}>Легенда:</strong>
-          {Object.entries(DEGREES).map(([key, d]) => (
-            <span key={key} style={{ padding: '3px 10px', backgroundColor: d.bg, color: d.color, fontFamily: DS.font, fontSize: '11px', fontWeight: 700, border: `1px solid ${d.color}33` }}>{d.label}</span>
-          ))}
-        </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', border: TBDR, fontFamily: DS.font, fontSize: '12px' }}>
             <thead><tr style={THR}>
-              <th style={TH}>№</th>
-              <th style={TH}>Дата</th>
-              <th style={TH}>Час</th>
-              <th style={TH}>Количество</th>
-              <th style={TH}>Партида, L</th>
-              <th style={TH}>Степен</th>
-              <th style={{ ...TH, textAlign: 'left' }}>Забележки</th>
+              <th style={TH}>№</th><th style={TH}>Дата</th><th style={TH}>Час</th><th style={TH}>Количество</th>
+              <th style={TH}>Партида, L</th><th style={TH}>Степен</th><th style={{ ...TH, textAlign: 'left' }}>Забележки</th>
             </tr></thead>
             <tbody>
               {filledRecords.map((record, idx) => {
-                const origIdx = (data.records || []).indexOf(record);
-                const ri = origIdx >= 0 ? origIdx : idx;
+                const origIdx = (data.records || []).indexOf(record); const ri = origIdx >= 0 ? origIdx : idx;
                 const deg = DEGREES[record.degree] || { label: record.degree || '-', color: DS.color.graphiteMuted, bg: DS.color.surfaceAlt };
                 return (
                   <tr key={idx} style={ZEBRA(idx)}>
@@ -628,23 +665,16 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
                     <EC path={`records.${ri}.time`} style={{ ...TD, textAlign: 'center' }}>{record.time || '-'}</EC>
                     <EC path={`records.${ri}.quantity`} style={{ ...TD, textAlign: 'center' }}>{record.quantity || '-'}</EC>
                     <EC path={`records.${ri}.batchL`} style={{ ...TD, textAlign: 'center' }}>{record.batchL || '-'}</EC>
-                    <td style={{ ...TD, textAlign: 'center', fontWeight: 700, color: deg.color, backgroundColor: deg.bg, fontSize: '14px' }}>
-                      {record.degree || '-'}
-                    </td>
+                    <td style={{ ...TD, textAlign: 'center', fontWeight: 700, color: deg.color, backgroundColor: deg.bg, fontSize: '14px' }}>{record.degree || '-'}</td>
                     <EC path={`records.${ri}.notes`} style={TD}>{record.notes || '-'}</EC>
-                  </tr>
-                );
+                  </tr>);
               })}
             </tbody>
           </table>
         </div>
-      </div>
-    );
+      </div>);
   };
 
-  // ============================================
-  // 🌡️ REFRIGERATOR TEMPERATURE — logic UNCHANGED
-  // ============================================
   const renderRefrigeratorTemperature = () => {
     if (!data.rows || data.rows.length === 0) return null;
     const customColumns = data.customColumns || [];
@@ -658,7 +688,6 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
     const filledRows = data.rows.filter(r => r.date || Object.keys(r.data || {}).length > 0 || r.checkedBy || r.corrective);
     if (filledRows.length === 0) return null;
     const hasTimeSlots = filledRows.some(row => { const dataKeys = Object.keys(row.data || {}); return dataKeys.some(key => key.includes('_8') || key.includes('_19')); });
-
     return (
       <div style={{ marginTop: '24px' }}>
         <SecH title="Контрол температура на витрини" />
@@ -703,10 +732,6 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
       </div>);
   };
 
-
-  // ============================================
-  // 🧼 HYGIENE WORK CARD — logic UNCHANGED
-  // ============================================
   const renderHygieneCard = () => {
     if (!data.zones && !data.customRefrigerators && !data.completionData) return null;
     const zones = data.zones || []; const customRefrigerators = data.customRefrigerators || [];
@@ -751,22 +776,17 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
       </div>);
   };
 
-  // ============================================
-  // 👔 CLOTHING AND HYGIENE CONTROL — logic UNCHANGED
-  // ============================================
   const renderClothingHygieneControl = () => {
     if (!data.rows || !data.header) return null;
     const rows = data.rows || []; const header = data.header || {};
     const filledRows = rows.filter(r => r.name || r.position);
     if (filledRows.length === 0) return null;
-
     const StatusCard = ({ label, value, isOk }) => (
       <div style={{ padding: '14px', backgroundColor: isOk ? DS.color.okBg : DS.color.dangerBg, border: `2px solid ${isOk ? DS.color.ok : DS.color.danger}44` }}>
         <div style={{ fontFamily: DS.font, fontSize: '10px', fontWeight: 700, color: DS.color.graphiteMuted, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>{label}</div>
         <div style={{ fontFamily: DS.font, fontWeight: 700, fontSize: '15px', color: isOk ? DS.color.ok : DS.color.danger }}>{value}</div>
       </div>
     );
-
     return (
       <div style={{ marginTop: '24px' }}>
         <SecH title="Контрол на работното облекло и хигиена на персонала" />
@@ -779,7 +799,7 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
           {filledRows.map((row, idx) => {
             const hasIssues = row.wounds !== 'none' || row.jewelry !== 'none' || row.work_clothing !== 'clean' || row.personal_hygiene !== 'good' || row.health_status !== 'good';
             return (
-              <div key={row.id || idx} style={{ backgroundColor: DS.color.surface, border: `2px solid ${hasIssues ? DS.color.warning : DS.color.ok}44`, boxShadow: DS.shadow.sm, animation: 'cf 0.4s ease', overflow: 'hidden' }}>
+              <div key={row.id || idx} style={{ backgroundColor: DS.color.surface, border: `2px solid ${hasIssues ? DS.color.warning : DS.color.ok}44`, boxShadow: DS.shadow.sm, overflow: 'hidden' }}>
                 <div style={{ padding: '12px 16px', backgroundColor: hasIssues ? DS.color.warningBg : DS.color.okBg, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', borderBottom: `1px solid ${DS.color.borderLight}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ backgroundColor: DS.color.primary, color: '#fff', width: '28px', height: '28px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontFamily: DS.font, fontSize: '13px', fontWeight: 700, borderRadius: '50%' }}>{row.number}</span>
@@ -807,10 +827,6 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
       </div>);
   };
 
-
-  // ============================================
-  // 🗄️ REFRIGERATOR STORAGE CONTROL — logic UNCHANGED
-  // ============================================
   const renderRefrigeratorStorageControl = () => {
     if (!data.dateBlocks || data.dateBlocks.length === 0) return null;
     const dateBlocks = data.dateBlocks; const customRefrigerators = data.customRefrigerators || [];
@@ -860,9 +876,6 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
       </div>);
   };
 
-  // ============================================
-  // 📦 INCOMING MATERIALS — logic UNCHANGED
-  // ============================================
   const renderIncomingMaterialsControl = () => {
     if (!data.materials || data.materials.length === 0) return null;
     const materials = data.materials || [];
@@ -903,17 +916,9 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
               </tr>); })}</tbody>
           </table>
         </div>
-        <div style={{ marginTop: '10px', padding: '8px', backgroundColor: DS.color.infoBg, fontFamily: DS.font, fontSize: '11px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          <strong>Легенда:</strong>
-          <span style={{ padding: '2px 8px', backgroundColor: DS.color.okBg }}>✅ Приет / Чисто</span>
-          <span style={{ padding: '2px 8px', backgroundColor: DS.color.dangerBg }}>❌ Отказан / Мръсно</span>
-        </div>
       </div>);
   };
 
-  // ============================================
-  // 📋 GENERIC CHECKLIST — logic UNCHANGED
-  // ============================================
   const renderGenericChecklist = () => {
     if (!data.items || data.items.length === 0) return null;
     const filledItems = data.items.filter(item => item.description || item.completed || item.notes);
@@ -936,15 +941,14 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
       </div>);
   };
 
-
   // ============================================
-  // MAIN RENDER — DS shell, logic UNCHANGED
+  // MAIN RENDER
   // ============================================
   return (<><style>{DSS}</style>
     <div style={{ minHeight: '100vh', backgroundColor: DS.color.bg, fontFamily: DS.font, color: DS.color.graphite, display: 'flex', flexDirection: 'column' }}>
 
       {/* DARK TOP BAR */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 100, backgroundColor: DS.color.graphite, padding: '0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '48px', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
+      <div className="no-print" style={{ position: 'sticky', top: 0, zIndex: 100, backgroundColor: DS.color.graphite, padding: '0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '48px', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
         <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px', backgroundColor: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: DS.radius, color: 'white', fontSize: '12px', fontFamily: DS.font, fontWeight: 600, cursor: 'pointer' }}>
           <Ic n="back" sz={14} c="white" /> Назад
         </button>
@@ -956,9 +960,14 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
             </button>
           )}
           {!editMode ? (
-            <button onClick={startEdit} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', backgroundColor: DS.color.warning, border: 'none', borderRadius: DS.radius, color: '#fff', fontSize: '11px', fontFamily: DS.font, fontWeight: 600, cursor: 'pointer' }}>
-              <Ic n="edit" sz={12} c="#fff" /> Редактирай
-            </button>
+            <>
+              <button onClick={handlePrint} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', backgroundColor: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: DS.radius, color: 'white', fontSize: '11px', fontFamily: DS.font, fontWeight: 600, cursor: 'pointer' }}>
+                <Ic n="print" sz={12} c="white" /> Принт
+              </button>
+              <button onClick={startEdit} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', backgroundColor: DS.color.warning, border: 'none', borderRadius: DS.radius, color: '#fff', fontSize: '11px', fontFamily: DS.font, fontWeight: 600, cursor: 'pointer' }}>
+                <Ic n="edit" sz={12} c="#fff" /> Редактирай
+              </button>
+            </>
           ) : (<>
             <button onClick={handleCancel} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', backgroundColor: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: DS.radius, color: 'white', fontSize: '11px', fontFamily: DS.font, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.5 : 1 }}>
               <Ic n="x" sz={12} c="white" /> Отказ
@@ -1022,6 +1031,7 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
 
         {/* CONTENT CARD */}
         <div style={{ backgroundColor: DS.color.surface, border: `1px solid ${DS.color.borderLight}`, boxShadow: DS.shadow.sm, padding: pad, animation: 'cf 0.4s ease' }}>
+          {renderPizzaRecords()}
           {renderPizzaTable()}
           {renderChickenProduction()}
           {renderDonerProduction()}
@@ -1037,7 +1047,7 @@ const ImprovedSubmissionDetail = ({ submission: initialSubmission, onBack }) => 
           {renderPortionAndDefect()}
           {renderGenericChecklist()}
 
-          {!data.temperatures && !data.productions && !data.records && !data.rows && !data.dateBlocks && !data.zones && !data.completionData && !data.items && !data.materials && !data.summary && (
+          {!data.temperatures && !data.productions && !data.records && !data.rows && !data.dateBlocks && !data.zones && !data.completionData && !data.items && !data.materials && !data.summary && !data.date && !data.inventoryItems && !data.defectiveItems && (
             <div style={{ padding: '40px', textAlign: 'center', color: DS.color.graphiteMuted, backgroundColor: DS.color.surfaceAlt, fontFamily: DS.font }}>
               <div style={{ fontSize: '48px', marginBottom: '12px' }}>📋</div>
               <p style={{ fontSize: '14px', margin: 0 }}>Няма налични данни за показване</p>

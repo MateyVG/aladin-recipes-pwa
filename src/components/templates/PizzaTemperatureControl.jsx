@@ -1043,3 +1043,4 @@ const PizzaTemperatureControl = ({ template, config, department, restaurantId, o
 };
 
 export default PizzaTemperatureControl;
+
